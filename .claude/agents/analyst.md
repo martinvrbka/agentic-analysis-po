@@ -47,8 +47,9 @@ The PRD is for grooming. The delivery team will design the implementation. Frame
 3. **Rounds ≥ 2:** for each dimension give either a NEW finding, a REOPEN of an existing DL row, or a **closure
    statement** naming the DL rows and PRD section that now settle that dimension, with the specific evidence.
    "Looks fine" is not a closure statement.
-4. **Verify claimed fixes.** For every row whose Resolution starts with `FIX`, check that the cited PRD section
-   actually contains the fix. If it does not, REOPEN it.
+4. **Verify claimed fixes.** For every row whose Resolution starts with `FIX` or `PO DECISION`, check that the PRD
+   actually reflects it. If it does not, REOPEN it. A `PO DECISION` is a settled product choice: do not argue with
+   the choice itself, but do check it in the compounding pass.
 5. **Check hand-offs.** For every row with status `Tech team`, check it really is a "how" question. If it hides
    product behaviour the PO must decide (what users see, who is allowed, what counts as success), REOPEN it.
 6. **Source authority.** Any load-bearing claim that comes only from `requirement.md` and is not in

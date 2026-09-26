@@ -28,6 +28,32 @@ After each stage, print **at most 3 lines** in this form, and never file content
 `✔ Stage <n> · <name> — <what happened>` followed by the file(s) written and, where relevant,
 the output of `python3 scripts/check_decision_log.py D/decision-log.md --summary`.
 
+## PO checkpoint (procedure used in Stage 3 and Stage 4)
+The product owner answers open product questions live, so stories are built on decisions instead of gaps.
+Input: a set of DL ids, each with a prepared block under `## Questions for the PO` in a designer file.
+1. **Pick at most 4**: BLOCKING rows first, then in log order. Any others wait for the next checkpoint.
+2. Ask them in **one** AskUserQuestion call, one question per DL id, copying the designer's text as is:
+   - `header`: the DL id. `question`: the designer's Question line.
+   - `options`: the recommended option first with ` (Recommended)` appended to its label, then the other options
+     (label = text before ` — `, description = text after it), then **`Leave for grooming`** (description:
+     "Keep it open and discuss it with the team"). Stay within 4 options: if the designer gave 3, drop the
+     least-preferred non-recommended one.
+   - `multiSelect`: true only if the block says `Combinable: yes`.
+   - The user can always choose Other and type their own answer. Treat that as the decision, word for word.
+3. For each answer:
+   - **Decided**: append `- PO decision on DL-###: <answer> (confirmed by user, /groom run <k>, <label>)` to
+     `D/confirmed-facts.md`. Set the row to Resolved, Resolution `PO DECISION: <answer> · prev: <old>`.
+   - **Leave for grooming**: keep Still Open (or BLOCKING), and append ` · deferred to grooming by PO` to its
+     Resolution. Never ask about that id again in this run.
+4. If anything was decided, spawn a **fresh** Agent `designer`:
+   ```
+   Mode: apply. Round: <N or F>. Run folder: W.
+   Read W/prd-draft.md, D/confirmed-facts.md, D/decision-log.md.
+   Apply PO decisions for: <decided DL ids>.
+   Edit W/prd-draft.md. Write W/rounds/r<N or F>-designer-apply.md.
+   ```
+5. Summary line: `✔ PO checkpoint — decided: <ids> · deferred: <ids> · still queued: <ids>`.
+
 ---
 
 ## Stage 0 · Preflight (ask, don't guess)
@@ -53,7 +79,7 @@ the output of `python3 scripts/check_decision_log.py D/decision-log.md --summary
 
    Cumulative across all rounds and runs. Rows are never deleted; status may change.
    Status: Resolved | Still Open | Still Open (BLOCKING) | Tech team.
-   Resolution prefixes: FIX / ACCEPTED RISK / OPEN QUESTION (PO) / TECH QUESTION / REOPENED / COVERAGE GAP / NOT ADDRESSED.
+   Resolution prefixes: FIX / ACCEPTED RISK / PO DECISION / OPEN QUESTION (PO) / TECH QUESTION / REOPENED / COVERAGE GAP / NOT ADDRESSED.
 
    | ID | Question/Issue | Raised in | Status | Resolution | Last updated |
    |---|---|---|---|---|---|
@@ -115,7 +141,9 @@ Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
    Any id you asked about that has no row in the response → Still Open, `NOT ADDRESSED R · prev: <old>`.
    Nothing is silently dropped.
 7. Summary: FIX / ACCEPT-RISK / OPEN-QUESTION / TECH-QUESTION counts and the log summary line.
-8. If N = 3, run a **closing** Agent `analyst`, prompt:
+8. **PO checkpoint** for this round's OPEN-QUESTION ids plus any still queued from earlier rounds (their question
+   blocks are in `W/rounds/r<N>-designer-response.md` or earlier response files).
+9. If N = 3, run a **closing** Agent `analyst`, prompt:
    ```
    Mode: closing. Round: F. Run folder: W.
    Read W/requirement.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md.
@@ -124,9 +152,21 @@ Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
    Log its findings as in step 2 with `R = run<k>-RF`. They stay open for grooming, with no further designer turn.
 Record `rounds` and the final `verdict` in run-state.json.
 
-## Stage 4 · Decision log checkpoint
-Run `python3 scripts/check_decision_log.py D/decision-log.md` (it must print OK). Summary: the final verdict, the log
-summary line, and the ids of BLOCKING rows.
+## Stage 4 · Final PO checkpoint and decision log check
+1. Collect every row that is Still Open or BLOCKING, is not `Tech team`, and was not deferred to grooming.
+2. For those without a prepared question block (e.g. from the closing review, NOT ADDRESSED, or reopened rows),
+   spawn a fresh Agent `designer`:
+   ```
+   Mode: options. Run folder: W.
+   Read W/prd-draft.md, D/confirmed-facts.md, D/decision-log.md.
+   Prepare PO questions for: <ids>.
+   Write W/rounds/rF-designer-options.md.
+   ```
+   Ids it marks `TECH-QUESTION` → status Tech team, `TECH QUESTION: <question> · prev: <old>`.
+3. Run the **PO checkpoint** repeatedly, 4 questions at a time, until every collected id is decided or deferred.
+   This is the last chance before stories are written, so nothing stays queued.
+4. Run `python3 scripts/check_decision_log.py D/decision-log.md` (it must print OK). Summary: the final verdict, the
+   log summary line, the ids of BLOCKING rows and the ids deferred to grooming.
 
 ## Stage 5 · User stories
 Agent `story-writer`, prompt:

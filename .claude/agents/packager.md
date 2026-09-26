@@ -46,7 +46,8 @@ Run <n> · <date> · Debate verdict: <verdict> · Decision log: <summary line gi
 ## 5. Proposed story map / feature split
    First line: "_This is a proposal for discussion at grooming, not a final commitment._"
    (the table and slice lines from story-map.md)
-## 6. Open product questions for grooming (Still Open DL rows, BLOCKING first: id + one line; then coverage GAPs)
+## 6. Open product questions for grooming (Still Open DL rows, BLOCKING first: id + one line, marking those the
+   PO deferred to grooming; then coverage GAPs)
 ## 7. Questions for the technical team  (every `Tech team` DL row: id + the question, one line each)
 ## 8. Working files                     (relative links: requirement.md, prd-draft.md, ../decision-log.md, rounds/, coverage-report.md)
 ```

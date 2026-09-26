@@ -2,6 +2,9 @@
 
 `/groom <requirement.md>` turns a requirement into a short, product-level grooming package under `groomed/<slug>/`.
 Technical design is left to the delivery team: technical concerns are listed as questions for them, not answered.
+
+Product questions are asked live: after each debate round, and once more before stories are written, you get up to
+4 questions at a time with a recommended option. Pick one, type your own answer, or choose "Leave for grooming".
 The Designer and Analyst are separate subagents, and a hook limits the Analyst to the written PRD and its inputs.
 
 ## Run
