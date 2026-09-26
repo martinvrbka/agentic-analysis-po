@@ -1,7 +1,7 @@
 # Grooming pipeline
 
 `/groom <requirement.md>` turns a requirement into a grooming package under `groomed/<slug>/`.
-The Designer and Analyst are separate subagents, and the Analyst is blocked by a hook from reading Designer reasoning.
+The Designer and Analyst are separate subagents, and a hook limits the Analyst to the written PRD and its inputs.
 
 ## Run
 - Inside Claude Code (from this folder): `/groom requirements/example-csv-export.md`
@@ -14,7 +14,7 @@ The first time, accept the workspace-trust prompt. The isolation hooks in `.clau
 |---|---|---|
 | 0 Preflight, 1 Clarify | orchestrator (asks you) | `requirement.md`, `confirmed-facts.md` |
 | 2 Draft | `prd-drafter` | `prd-draft.md` |
-| 3 Debate (≤3 rounds) | fresh `designer` / `analyst` per turn | `rounds/`, `designer-notes/` (analyst-blocked), updated `prd-draft.md` |
+| 3 Debate (≤3 rounds) | fresh `designer` / `analyst` per turn | `rounds/` (designer files analyst-blocked), updated `prd-draft.md` |
 | 4 Decision log | orchestrator + `check_decision_log.py` hook | `decision-log.md` |
 | 5 Stories | `story-writer` | `user-stories.md`, `story-map.md` |
 | 6 Coverage | `packager` (prep), `coverage-checker` | `business-case.md`, `definition-of-done.md`, `coverage-report.md` |

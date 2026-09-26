@@ -22,8 +22,8 @@ never put feature-specific content here, or it leaks into agents that are suppos
 ## Isolation contract
 - Agents receive **file paths**, not paraphrases. The orchestrator never summarises one agent's output into another
   agent's prompt.
-- The analyst never sees designer reasoning (`designer-notes/`, `rounds/*-designer-*`), and no agent sees another
-  agent's chat history. This is enforced by `scripts/guard.py` hooks, not only by these instructions.
+- The analyst reviews only the PRD, requirement, confirmed facts and decision log. It never sees the designer's round
+  files (`rounds/*-designer-*`), and no agent sees another agent's chat history. This is enforced by `scripts/guard.py` hooks, not only by these instructions.
 - Subagents do not spawn other agents or message each other.
 
 ## Decision log

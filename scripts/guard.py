@@ -25,14 +25,12 @@ ROLES = {
     "designer": {
         "read": ["personas/design-analysis-debate/SKILL.md", F + "requirement.md", F + "confirmed-facts.md",
                  F + "prd-draft.md", F + "decision-log.md", F + "rounds/r*-analyst.md"],
-        # A fresh designer instance must not inherit a previous instance's private reasoning.
-        "deny_read": [F + "designer-notes/*"],
-        "write": [F + "prd-draft.md", F + "rounds/r*-designer-*.md", F + "designer-notes/*.md"],
+        "write": [F + "prd-draft.md", F + "rounds/r*-designer-*.md"],
     },
     "analyst": {
         "read": ["personas/design-analysis-debate/SKILL.md", F + "requirement.md", F + "confirmed-facts.md",
                  F + "prd-draft.md", F + "decision-log.md"],
-        "deny_read": [F + "designer-notes/*", F + "rounds/*designer*", F + "history/*"],
+        "deny_read": [F + "rounds/*designer*", F + "history/*"],
         "write": [F + "rounds/r*-analyst.md"],
     },
     "story-writer": {

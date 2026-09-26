@@ -15,7 +15,6 @@ You coordinate; you do not author. You write only `requirement.md`, `confirmed-f
   Fill in only paths, round numbers and modes. **Never** add summaries, quotes, opinions or hints drawn from another
   agent's output, and never tell an agent what a previous round "was worried about". Paths only.
 - A **new** Agent call for every designer and analyst turn. Never resume or message a previous instance.
-- Do not read `designer-notes/`. You don't need it, and nothing you don't read can leak.
 - The guard hooks will block workers from files outside their allowlist. If a worker reports a guard block, do not
   work around it; report it to the user.
 
@@ -34,11 +33,11 @@ the output of `python3 scripts/check_decision_log.py <log> --summary`.
    (options: your proposed slug; any existing folder that could be the same feature, marked as a re-run; Other).
    Never create a folder the user has not confirmed.
 3. Let `D = groomed/<slug>`. Determine the mode:
-   - **New:** `mkdir -p D/rounds D/designer-notes D/history D/.state`. Run number `k = 1`.
+   - **New:** `mkdir -p D/rounds D/history D/.state`. Run number `k = 1`.
    - **Re-run** (D exists): read `D/.state/run-state.json`. If the last run is incomplete, ask the user whether to
      resume it or start a new run. For a new run, set `k = last + 1` and archive: `mkdir -p D/history/run-<k-1>` and
      `cp` requirement.md, prd-draft.md, user-stories.md, story-map.md, business-case.md, definition-of-done.md,
-     coverage-report.md, final-prd.md (those that exist) into it, then **move** `rounds/` and `designer-notes/`
+     coverage-report.md, final-prd.md (those that exist) into it, then **move** the `rounds/`
      contents into it. **Never** archive or move `decision-log.md`, `confirmed-facts.md` or `.state/`. The decision
      log and confirmed facts carry forward. Show the user a ≤ 5-line gist of what changed between the old and new
      requirement (use `diff`).
@@ -81,7 +80,7 @@ Write D/prd-draft.md.
 ```
 Mode: propose. Round: 1. Feature folder: D.
 Read D/requirement.md, D/confirmed-facts.md, D/prd-draft.md<, D/decision-log.md if it has rows>.
-Edit D/prd-draft.md. Write D/rounds/r1-designer-proposal.md and D/designer-notes/r1-proposal.md.
+Edit D/prd-draft.md. Write D/rounds/r1-designer-proposal.md.
 ```
 **Each round N = 1..3:**
 1. Agent `analyst`, prompt:
@@ -107,7 +106,7 @@ Edit D/prd-draft.md. Write D/rounds/r1-designer-proposal.md and D/designer-notes
    Mode: respond. Round: <N>. Feature folder: D.
    Read D/requirement.md, D/confirmed-facts.md, D/prd-draft.md, D/decision-log.md, D/rounds/r<N>-analyst.md.
    Respond to these DL ids: <comma-separated ids opened or reopened in this round>.
-   Edit D/prd-draft.md. Write D/rounds/r<N>-designer-response.md and D/designer-notes/r<N>-response.md.
+   Edit D/prd-draft.md. Write D/rounds/r<N>-designer-response.md.
    ```
 6. **Log the dispositions** from `rounds/r<N>-designer-response.md`:
    `FIX` → Resolved, `FIX: <resolution> (<§>)` · `ACCEPT-RISK` → Resolved, `ACCEPTED RISK: <resolution>` ·
