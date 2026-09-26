@@ -21,7 +21,7 @@ import re
 import sys
 from collections import Counter
 
-STATUSES = ("Resolved", "Still Open", "Still Open (BLOCKING)")
+STATUSES = ("Resolved", "Still Open", "Still Open (BLOCKING)", "Tech team")
 ROW = re.compile(r"^\|\s*(DL-\d{3,})\s*\|")
 CELL_SEP = re.compile(r"(?<!\\)\|")  # "|" not preceded by a backslash
 
@@ -75,7 +75,7 @@ def summary(log_path):
     rows, _ = parse(log_path)
     c = Counter(r["status"] for r in rows.values())
     return (f"{len(rows)} rows: {c['Resolved']} Resolved, {c['Still Open']} Still Open, "
-            f"{c['Still Open (BLOCKING)']} BLOCKING")
+            f"{c['Still Open (BLOCKING)']} BLOCKING, {c['Tech team']} for tech team")
 
 
 def next_id(log_path):

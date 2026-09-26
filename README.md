@@ -1,6 +1,7 @@
 # Grooming pipeline
 
-`/groom <requirement.md>` turns a requirement into a grooming package under `groomed/<slug>/`.
+`/groom <requirement.md>` turns a requirement into a short, product-level grooming package under `groomed/<slug>/`.
+Technical design is left to the delivery team: technical concerns are listed as questions for them, not answered.
 The Designer and Analyst are separate subagents, and a hook limits the Analyst to the written PRD and its inputs.
 
 ## Run
@@ -9,19 +10,25 @@ The Designer and Analyst are separate subagents, and a hook limits the Analyst t
 
 The first time, accept the workspace-trust prompt. The isolation hooks in `.claude/agents/*.md` do not run without it.
 
-## Stages → files in `groomed/<slug>/`
+## Stages → files in `groomed/<slug>/run-<n>_<date>/`
 | Stage | Who | Output |
 |---|---|---|
-| 0 Preflight, 1 Clarify | orchestrator (asks you) | `requirement.md`, `confirmed-facts.md` |
+| 0 Preflight, 1 Clarify | orchestrator (asks you) | `requirement.md`, `../confirmed-facts.md` |
 | 2 Draft | `prd-drafter` | `prd-draft.md` |
 | 3 Debate (≤3 rounds) | fresh `designer` / `analyst` per turn | `rounds/` (designer files analyst-blocked), updated `prd-draft.md` |
-| 4 Decision log | orchestrator + `check_decision_log.py` hook | `decision-log.md` |
+| 4 Decision log | orchestrator + `check_decision_log.py` hook | `../decision-log.md` |
 | 5 Stories | `story-writer` | `user-stories.md`, `story-map.md` |
 | 6 Coverage | `packager` (prep), `coverage-checker` | `business-case.md`, `definition-of-done.md`, `coverage-report.md` |
 | 7 Package | `packager` (assemble) | **`final-prd.md`** |
 
-Re-running on an existing slug archives the previous run to `history/run-<n>/` and carries `decision-log.md` and
-`confirmed-facts.md` forward.
+```
+groomed/<slug>/
+├── decision-log.md      shared by all runs of this feature
+├── confirmed-facts.md   shared by all runs of this feature
+├── run-1_2026-09-26/    everything run 1 produced (final-prd.md, stories, rounds/, …)
+└── run-2_2026-09-28/
+```
+Running `/groom` again on the same feature creates a new run folder and never touches earlier ones.
 
 ## Guarantees enforced by code, not prompts
 - `scripts/guard.py`: per-role read/write allowlist and Read/Write-only tools, wired as a PreToolUse hook in each agent.

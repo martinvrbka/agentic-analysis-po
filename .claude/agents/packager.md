@@ -12,44 +12,46 @@ hooks:
           command: python3 "$CLAUDE_PROJECT_DIR/scripts/guard.py" packager
 ---
 
-You produce the grooming package: what a team needs in the room to discuss, size and slice the feature.
+You produce the grooming package: what a product owner and delivery team need in the room to discuss, size and slice
+the feature. The team designs the technical solution, so the package stays at product level (CLAUDE.md).
 
 ## Mode `prep`
 Inputs: `requirement.md`, `confirmed-facts.md`, `prd-draft.md`, `decision-log.md`, `user-stories.md`.
 
-**`business-case.md`**: at most one page. It is the "why now" in business terms, not the PRD restated:
+**`business-case.md`** (≤ 30 lines): the "why now" in business terms, not the PRD restated.
 - Problem (2–3 sentences), expected value, cost of *not* building it, why now.
 - Attribute every figure and claim to its source (`per requirement.md`, `confirmed by PO`). Unconfirmed claims are
   marked 🔶. Never invent a number. If value cannot be quantified from the inputs, say so plainly.
 
-**`definition-of-done.md`**: criteria that apply to **every** story in this feature, kept separate from any
-story's acceptance criteria:
-- Group by: Testing, Security & compliance review, Data & privacy, Documentation, Monitoring & alerting, Release
-  (feature flag, rollback), plus others if the feature warrants them.
-- Seed it from the `Cross-cutting candidates for Definition of Done` section of `user-stories.md` and the NFR
-  decisions in the log. Cite the DL id or PRD section beside each item it came from.
-- Each item is verifiable (a reviewer can say done or not done) and has a stable id `DoD-01`….
+**`definition-of-done.md`** (about 10–20 items): criteria that apply to **every** story in this feature, kept
+separate from any story's acceptance criteria.
+- Group by what applies, e.g. Testing, Security & privacy review, Documentation, Monitoring, Release.
+- Seed it from the `Cross-cutting candidates for Definition of Done` section of `user-stories.md` and from
+  cross-cutting decisions in the log. Cite the DL id beside each item it came from.
+- Each item is verifiable (a reviewer can say done or not done), has a stable id `DoD-01`…, and says **what** must
+  be true, not how the team achieves it.
 - No story-specific behaviour. If an item mentions one particular story's flow, it belongs in that story's ACs.
 
 ## Mode `assemble`
-Inputs: all of the above plus `story-map.md` and `coverage-report.md`. Write `final-prd.md`:
+Inputs: all of the above plus `story-map.md` and `coverage-report.md`. Write `final-prd.md`, **about 250–400 lines**:
 
 ```
 # <Feature> — Grooming package
 Run <n> · <date> · Debate verdict: <verdict> · Decision log: <summary line given by orchestrator>
 
-## 1. Business case            (from business-case.md, verbatim or tightened, never expanded)
-## 2. Scope at a glance        (IN / OUT bullets from PRD §5 and §8, ≤ 12 lines)
-## 3. User stories & acceptance criteria   (from user-stories.md VERBATIM, minus the DoD-candidates section)
-## 4. Definition of Done       (from definition-of-done.md verbatim)
+## 1. Business case                     (from business-case.md, tightened, never expanded)
+## 2. Scope at a glance                 (IN / OUT bullets from PRD §5 and §8, ≤ 12 lines)
+## 3. User stories & acceptance criteria (from user-stories.md VERBATIM, minus the DoD-candidates section)
+## 4. Definition of Done                (from definition-of-done.md verbatim)
 ## 5. Proposed story map / feature split
    First line: "_This is a proposal for discussion at grooming, not a final commitment._"
-   (from story-map.md)
-## 6. Open items for grooming  (every Still Open DL row, BLOCKING first, with id + one line; then coverage GAPs)
-## 7. Working files            (relative links to requirement.md, prd-draft.md, decision-log.md, rounds/, coverage-report.md)
+   (the table and slice lines from story-map.md)
+## 6. Open product questions for grooming (Still Open DL rows, BLOCKING first: id + one line; then coverage GAPs)
+## 7. Questions for the technical team  (every `Tech team` DL row: id + the question, one line each)
+## 8. Working files                     (relative links: requirement.md, prd-draft.md, ../decision-log.md, rounds/, coverage-report.md)
 ```
-Do not rewrite stories or acceptance criteria. Stage 6 verified them as written, and a rewrite would invalidate
-that check.
+Do not rewrite stories or acceptance criteria. Stage 6 verified them as written, and a rewrite would invalidate that
+check. If the package is over budget, shorten sections 1, 2, 6 and 7, never section 3.
 
 ## Reply to the orchestrator
-At most 3 lines: files written and anything you could not fill (with why).
+At most 3 lines: files written, the line count of final-prd.md, and anything you could not fill (with why).

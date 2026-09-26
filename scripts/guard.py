@@ -12,43 +12,45 @@ import json
 import os
 import sys
 
-F = "groomed/*/"  # every feature folder
+S = "groomed/*/"        # shared across runs: decision-log.md, confirmed-facts.md
+R = "groomed/*/run-*/"  # one run's working folder
 
 COMMON_READ = ["CLAUDE.md"]
 
 ROLES = {
     "prd-drafter": {
-        "read": ["personas/prd-development/*", F + "requirement.md", F + "confirmed-facts.md",
-                 F + "prd-draft.md", F + "decision-log.md"],
-        "write": [F + "prd-draft.md"],
+        # Also reads the previous run's prd-draft.md in update mode (same pattern).
+        "read": ["personas/prd-development/*", R + "requirement.md", S + "confirmed-facts.md",
+                 R + "prd-draft.md", S + "decision-log.md"],
+        "write": [R + "prd-draft.md"],
     },
     "designer": {
-        "read": ["personas/design-analysis-debate/SKILL.md", F + "requirement.md", F + "confirmed-facts.md",
-                 F + "prd-draft.md", F + "decision-log.md", F + "rounds/r*-analyst.md"],
-        "write": [F + "prd-draft.md", F + "rounds/r*-designer-*.md"],
+        "read": ["personas/design-analysis-debate/SKILL.md", R + "requirement.md", S + "confirmed-facts.md",
+                 R + "prd-draft.md", S + "decision-log.md", R + "rounds/r*-analyst.md"],
+        "write": [R + "prd-draft.md", R + "rounds/r*-designer-*.md"],
     },
     "analyst": {
-        "read": ["personas/design-analysis-debate/SKILL.md", F + "requirement.md", F + "confirmed-facts.md",
-                 F + "prd-draft.md", F + "decision-log.md"],
-        "deny_read": [F + "rounds/*designer*", F + "history/*"],
-        "write": [F + "rounds/r*-analyst.md"],
+        "read": ["personas/design-analysis-debate/SKILL.md", R + "requirement.md", S + "confirmed-facts.md",
+                 R + "prd-draft.md", S + "decision-log.md"],
+        "deny_read": [S + "rounds/*designer*"],
+        "write": [R + "rounds/r*-analyst.md"],
     },
     "story-writer": {
-        "read": ["personas/user-story/*", "personas/user-story-mapping/*", F + "confirmed-facts.md",
-                 F + "prd-draft.md", F + "decision-log.md"],
-        "write": [F + "user-stories.md", F + "story-map.md"],
+        "read": ["personas/user-story/*", "personas/user-story-mapping/*", S + "confirmed-facts.md",
+                 R + "prd-draft.md", S + "decision-log.md", R + "user-stories.md"],
+        "write": [R + "user-stories.md", R + "story-map.md"],
     },
     "coverage-checker": {
         # Deliberately no PRD: it checks decisions against stories, not stories against intent.
-        "read": ["personas/design-analysis-debate/SKILL.md", F + "decision-log.md", F + "user-stories.md",
-                 F + "definition-of-done.md"],
-        "write": [F + "coverage-report.md"],
+        "read": ["personas/design-analysis-debate/SKILL.md", S + "decision-log.md", R + "user-stories.md",
+                 R + "definition-of-done.md"],
+        "write": [R + "coverage-report.md"],
     },
     "packager": {
-        "read": [F + "requirement.md", F + "confirmed-facts.md", F + "prd-draft.md", F + "decision-log.md",
-                 F + "user-stories.md", F + "story-map.md", F + "business-case.md",
-                 F + "definition-of-done.md", F + "coverage-report.md"],
-        "write": [F + "business-case.md", F + "definition-of-done.md", F + "final-prd.md"],
+        "read": [R + "requirement.md", S + "confirmed-facts.md", R + "prd-draft.md", S + "decision-log.md",
+                 R + "user-stories.md", R + "story-map.md", R + "business-case.md",
+                 R + "definition-of-done.md", R + "coverage-report.md"],
+        "write": [R + "business-case.md", R + "definition-of-done.md", R + "final-prd.md"],
     },
 }
 
