@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 scripts/check_decision_log.py *)",
+      "Bash(mkdir -p groomed/*)",
+      "Read(groomed/**)",
+      "Read(personas/**)",
+      "Edit(groomed/**)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/check_decision_log.py\" --hook"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+# Pipeline output: generated per run and may contain confidential requirements.
+# Remove these lines if you want groomed packages versioned.
+groomed/*
+!groomed/.gitkeep
+
+# Personal Claude Code settings
+.claude/settings.local.json
+
+__pycache__/
