@@ -42,8 +42,12 @@ The PRD is for grooming. The delivery team will design the implementation. Frame
 1. **Round 1 (no decision log yet, or first review of this draft): at least one NEW finding in every dimension**:
    Purpose fit, Data & failure handling, Behavior/edge cases, Security/NFRs, Testability of acceptance criteria.
    No "LGTM" and no generic checklist items. Every finding cites a PRD section or quotes the requirement.
-2. **Budget: at most 2 NEW findings per dimension per round, and at most 3 compounding risks.** Choose the ones
-   that would most change what gets built or how it is judged. Fold minor points into a related finding or drop them.
+2. **Budget: per the `Size:` tier (CLAUDE.md): small = at most 1 NEW finding per dimension and 2 compounding
+   risks per round; standard = 2 and 3.** Choose the ones that would most change what gets built or how it is judged.
+   Fold minor points into a related finding or drop them.
+   **Proportion:** attack the core flow, not the absence of extras. Do not raise findings that ask for more features,
+   or that only concern items in PRD §8 Out of scope / Later. "What if X?" is a finding only if X is likely for the
+   users in `confirmed-facts.md` and the core flow would fail without an answer.
 3. **Rounds ≥ 2:** for each dimension give either a NEW finding, a REOPEN of an existing DL row, or a **closure
    statement** naming the DL rows and PRD section that now settle that dimension, with the specific evidence.
    "Looks fine" is not a closure statement.
@@ -83,8 +87,9 @@ NEW_ISSUES: <count of NEW findings + NEW compounding risks + REOPENs>
 BLOCKING: <comma-separated refs or DL ids, or none>
 ```
 Type is `NEW` or `REOPEN DL-###`. Severity is `blocking`, `major` or `minor`. Keep cells single-line and escape `|`.
-**READY FOR GROOMING** is allowed only when NEW_ISSUES is 0 and nothing is blocking. It is therefore impossible in
-round 1, by design. Rows with status `Tech team` do not block a READY verdict.
+**READY FOR GROOMING** (this overrides the persona's "all rows Resolved") is given when no NEW finding, compounding risk or REOPEN of this round is `blocking` or
+`major`. Minor ones are still listed and counted in NEW_ISSUES; the designer answers them once and they go to grooming.
+Rows with status `Tech team` do not block a READY verdict.
 
 ## Reply to the orchestrator
 Exactly the three lines of the Verdict section. Nothing else. The orchestrator reads your file.

@@ -1,14 +1,15 @@
 ---
-description: Run the requirement → PRD → isolated Designer/Analyst debate → stories → coverage → grooming-package pipeline
+description: Run the requirement → PRD → isolated Designer/Analyst debate → stories → coverage → grooming-package → retro pipeline
 argument-hint: <requirement-file.md>
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Agent, AskUserQuestion, Bash(python3 scripts/check_decision_log.py *), Bash(mkdir *), Bash(ls *), Bash(date *), Bash(diff *), Bash(wc *)
+allowed-tools: Read, Write, Edit, Agent, AskUserQuestion, Bash(python3 scripts/check_decision_log.py *), Bash(python3 scripts/run_metrics.py *), Bash(mkdir *), Bash(ls *), Bash(date *), Bash(diff *), Bash(wc *)
 ---
 
 You are the **orchestrator** of the grooming pipeline. Requirement file: `$ARGUMENTS`
 
 You coordinate; you do not author. You write only `requirement.md`, `confirmed-facts.md`, `decision-log.md` and
-`.state/run-state.json`. Every other artifact is written by a subagent.
+`.state/run-state.json`. Every other artifact is written by a subagent, except `run-metrics.md`, which
+`scripts/run_metrics.py` writes.
 
 ## Paths
 - `D = groomed/<slug>`: shared across runs. Holds `decision-log.md`, `confirmed-facts.md`, `.state/`.
@@ -17,7 +18,8 @@ You coordinate; you do not author. You write only `requirement.md`, `confirmed-f
 
 ## Isolation rules for you (the main way isolation could break is through you)
 - Spawn every worker with the **Agent** tool using its `subagent_type` and the **exact prompt template** given below.
-  Fill in only paths, round numbers and modes. **Never** add summaries, quotes, opinions or hints drawn from another
+  Fill in only paths, round numbers, modes and the size tier. **Every** agent prompt starts with the line
+  `Size: <tier>.` (from run-state.json). **Never** add summaries, quotes, opinions or hints drawn from another
   agent's output, and never tell an agent what a previous round "was worried about". Paths only.
 - A **new** Agent call for every designer and analyst turn. Never resume or message a previous instance.
 - The guard hooks will block workers from files outside their allowlist. If a worker reports a guard block, do not
@@ -27,6 +29,8 @@ You coordinate; you do not author. You write only `requirement.md`, `confirmed-f
 After each stage, print **at most 3 lines** in this form, and never file contents:
 `✔ Stage <n> · <name> — <what happened>` followed by the file(s) written and, where relevant,
 the output of `python3 scripts/check_decision_log.py D/decision-log.md --summary`.
+After Stages 2, 3, 5 and 7, also add the output of `python3 scripts/run_metrics.py W --check <file>` for the file
+the stage wrote (`prd-draft.md`, `user-stories.md`, `final-prd.md`). If it says OVER, say so plainly in the summary.
 
 ## PO checkpoint (procedure used in Stage 3 and Stage 4)
 The product owner answers open product questions live, so stories are built on decisions instead of gaps.
@@ -40,6 +44,12 @@ Input: a set of DL ids, each with a prepared block under `## Questions for the P
      least-preferred non-recommended one.
    - `multiSelect`: true only if the block says `Combinable: yes`.
    - The user can always choose Other and type their own answer. Treat that as the decision, word for word.
+   - **An Other answer that points to another source** (a file, folder or earlier feature, e.g. "see the foodie-match
+     folder"): read that source yourself. Pick at most 3 claims from it that answer this DL question, quoted as
+     written. Ask the PO to confirm them in the **next** AskUserQuestion call (one question, `multiSelect: true`,
+     one option per claim, plus `None of these`). Only the claims the PO ticks become the decision:
+     `PO decision on DL-###: <ticked claims> (per <source>)`. If none are ticked, the row stays Still Open and is
+     asked again with the designer's options. Never pass the source's path to an agent instead.
 3. For each answer:
    - **Decided**: append `- PO decision on DL-###: <answer> (confirmed by user, /groom run <k>, <label>)` to
      `D/confirmed-facts.md`. Set the row to Resolved, Resolution `PO DECISION: <answer> · prev: <old>`.
@@ -84,8 +94,10 @@ Input: a set of DL ids, each with a prepared block under `## Questions for the P
    | ID | Question/Issue | Raised in | Status | Resolution | Last updated |
    |---|---|---|---|---|---|
    ```
-6. Update `D/.state/run-state.json`: `{"slug", "source", "runs": [{"run": k, "folder": "<W>", "started": <iso>, "stages": {}, "rounds": 0, "verdict": null}]}`
-   (append to `runs` on a re-run). Mark each stage `"done"` as it completes.
+6. **Size tier:** run `python3 scripts/run_metrics.py W --tier` (`small` or `standard`, see CLAUDE.md).
+   `MAX` = 2 rounds for small, 3 for standard.
+7. Update `D/.state/run-state.json`: `{"slug", "source", "runs": [{"run": k, "folder": "<W>", "started": <iso>, "size": "<tier>", "stages": {}, "rounds": 0, "verdict": null}]}`
+   (append to `runs` on a re-run). Mark each stage `"done"` as it completes. Put the tier in the Stage 0 summary.
 
 ## Stage 1 · Clarify (you, interactively)
 Judge whether `W/requirement.md` lets a drafter know: **who** the users are, **what problem**, **what success looks
@@ -103,14 +115,14 @@ Read W/requirement.md, D/confirmed-facts.md<, P/prd-draft.md, D/decision-log.md 
 Write W/prd-draft.md.
 ```
 
-## Stage 3 · Debate loop (max 3 rounds; `N` = round, `R = run<k>-R<N>` is the label in the log)
+## Stage 3 · Debate loop (max `MAX` rounds; `N` = round, `R = run<k>-R<N>` is the label in the log)
 **Round 1 only, first:** Agent `designer`, prompt:
 ```
 Mode: propose. Round: 1. Run folder: W.
 Read W/requirement.md, D/confirmed-facts.md, W/prd-draft.md<, D/decision-log.md if it has rows>.
 Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
 ```
-**Each round N = 1..3:**
+**Each round N = 1..MAX:**
 1. Agent `analyst`, prompt:
    ```
    Mode: review. Round: <N>. Run folder: W. <First review of this draft: yes — if N = 1>
@@ -126,7 +138,8 @@ Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
    - Never change an existing row's Question/Issue text. The PostToolUse hook rejects writes that drop or reword
      rows; if it fires, fix the log and do not bypass it.
 3. Summary: verdict, new/reopened/blocking counts, log summary line.
-4. If `VERDICT: READY FOR GROOMING` and `NEW_ISSUES: 0`, **exit the loop**.
+4. If `VERDICT: READY FOR GROOMING`: with `NEW_ISSUES: 0`, **exit the loop** now. Otherwise (only minor findings
+   remain) run steps 5–8 once for them, then **exit the loop** with no further analyst turn.
 5. Agent `designer` (a fresh one), prompt:
    ```
    Mode: respond. Round: <N>. Run folder: W.
@@ -143,7 +156,7 @@ Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
 7. Summary: FIX / ACCEPT-RISK / OPEN-QUESTION / TECH-QUESTION counts and the log summary line.
 8. **PO checkpoint** for this round's OPEN-QUESTION ids plus any still queued from earlier rounds (their question
    blocks are in `W/rounds/r<N>-designer-response.md` or earlier response files).
-9. If N = 3, run a **closing** Agent `analyst`, prompt:
+9. If N = MAX and the verdict was not READY, run a **closing** Agent `analyst`, prompt:
    ```
    Mode: closing. Round: F. Run folder: W.
    Read W/requirement.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md.
@@ -153,8 +166,15 @@ Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
 Record `rounds` and the final `verdict` in run-state.json.
 
 ## Stage 4 · Final PO checkpoint and decision log check
-1. Collect every row that is Still Open or BLOCKING, is not `Tech team`, and was not deferred to grooming.
-2. For those without a prepared question block (e.g. from the closing review, NOT ADDRESSED, or reopened rows),
+1. **Tech questions.** Read the `- TQ: <question>` lines in §9 of `W/prd-draft.md`. For each whose question text
+   is not already in a log row, add a row: Question/Issue = `[Tech] <question>`, Raised in = `run<k>-TQ`,
+   Status = `Tech team`, Resolution = `TECH QUESTION: <question>`, Last updated = `run<k>-TQ`. (Transcription only.)
+   **PRD open questions.** Read the table in §10 of `W/prd-draft.md`. For each row whose Status is `Open`, whose
+   Owner includes `PO`, which cites no DL id, and whose question text is not already in a log row, add a row:
+   Question/Issue = `[PRD §10] <question>`, Raised in = `run<k>-OQ`, Status = `Still Open`, Resolution = `—`,
+   Last updated = `run<k>-OQ`. (Transcription only.) They go through steps 2–4 like any other open row.
+2. Collect every row that is Still Open or BLOCKING, is not `Tech team`, and was not deferred to grooming.
+3. For those without a prepared question block (e.g. from the closing review, NOT ADDRESSED, or reopened rows),
    spawn a fresh Agent `designer`:
    ```
    Mode: options. Run folder: W.
@@ -163,10 +183,10 @@ Record `rounds` and the final `verdict` in run-state.json.
    Write W/rounds/rF-designer-options.md.
    ```
    Ids it marks `TECH-QUESTION` → status Tech team, `TECH QUESTION: <question> · prev: <old>`.
-3. Run the **PO checkpoint** repeatedly, 4 questions at a time, until every collected id is decided or deferred.
+4. Run the **PO checkpoint** repeatedly, 4 questions at a time, until every collected id is decided or deferred.
    This is the last chance before stories are written, so nothing stays queued.
-4. Run `python3 scripts/check_decision_log.py D/decision-log.md` (it must print OK). Summary: the final verdict, the
-   log summary line, the ids of BLOCKING rows and the ids deferred to grooming.
+5. Run `python3 scripts/check_decision_log.py D/decision-log.md` (it must print OK). Summary: the final verdict, the
+   log summary line, the ids of BLOCKING rows, the ids deferred to grooming and the number of tech questions.
 
 ## Stage 5 · User stories
 Agent `story-writer`, prompt:
@@ -175,7 +195,7 @@ Run folder: W. Read W/prd-draft.md, D/decision-log.md, D/confirmed-facts.md<, P/
 Write W/user-stories.md and W/story-map.md.
 ```
 
-## Stage 6 · Coverage check
+## Stage 6 · Coverage check and story revision
 1. Agent `packager`, prompt:
    ```
    Mode: prep. Run folder: W.
@@ -185,24 +205,58 @@ Write W/user-stories.md and W/story-map.md.
 2. Agent `coverage-checker`, prompt:
    ```
    Run folder: W. Read D/decision-log.md, W/user-stories.md, W/definition-of-done.md.
-   Write W/coverage-report.md.
+   Write W/coverage-report-1.md.
    ```
-3. For every `GAP` / `GAP (DoD-only)` row in the report: set that DL row to Still Open with
+3. If the report has **no** `GAP` row, no "Vague acceptance criteria" items and no "DoD / AC separation issues"
+   that name a DoD item, it is final: `COV = W/coverage-report-1.md`. Otherwise:
+   - if it has a GAP row or vague items, spawn a fresh Agent `story-writer`, prompt:
+     ```
+     Mode: revise. Run folder: W. Read W/prd-draft.md, D/decision-log.md, D/confirmed-facts.md, W/user-stories.md, W/coverage-report-1.md.
+     Edit W/user-stories.md.
+     ```
+   - if it names a DoD item under "DoD / AC separation issues", spawn a fresh Agent `packager`, prompt:
+     ```
+     Mode: prep. Only: definition-of-done.md. Run folder: W.
+     Read D/decision-log.md, W/user-stories.md, W/definition-of-done.md, W/coverage-report-1.md.
+     Edit W/definition-of-done.md.
+     ```
+   then a fresh Agent `coverage-checker` with the prompt from step 2 but `Write W/coverage-report.md.`
+   (`COV = W/coverage-report.md`). No further revision after this second check.
+4. For every `GAP` / `GAP (DoD-only)` row in `COV`: set that DL row to Still Open with
    `COVERAGE GAP run<k>: <what a scenario must assert> · prev: <old resolution>`, Last updated = `run<k>-coverage`.
    This applies even if the row was Resolved.
-4. Summary: covered / gaps / vague / implementation-detail / separation counts and the log summary line.
+5. **Unlogged story questions.** For each `🔵 Open Question` line in `W/user-stories.md` and each item still under
+   "Vague acceptance criteria" in `COV` whose text is not already in a log row, add a row: Question/Issue =
+   `[Stories] <US id>: <question or vague item, as written>`, Raised in = `run<k>-stories`, Status = `Still Open`,
+   Resolution = `—`, Last updated = `run<k>-stories`. (Transcription only.) The package then lists them in §6 with
+   every other open row, so nothing open stays outside the log.
+6. Summary: gaps / vague counts of the first check → of the final check, implementation-detail / separation counts,
+   the `--check user-stories.md` line and the log summary line.
 
 ## Stage 7 · Grooming package
 Agent `packager`, prompt:
 ```
 Mode: assemble. Run folder: W. Run: <k>. Date: <date>. Debate verdict: <verdict>.
 Decision log summary: <output of --summary>.
-Read W/business-case.md, W/prd-draft.md, D/decision-log.md, W/user-stories.md, W/definition-of-done.md, W/story-map.md, W/coverage-report.md.
+Read W/business-case.md, W/prd-draft.md, D/decision-log.md, W/user-stories.md, W/definition-of-done.md, W/story-map.md, COV.
 Write W/final-prd.md.
 ```
+
+## Stage 8 · Retro (suggestions only)
+1. Run `python3 scripts/run_metrics.py W` (it writes `W/run-metrics.md`).
+2. Agent `retro`, prompt:
+   ```
+   Run folder: W. Read W/run-metrics.md first, then the files in W and W/rounds, D/decision-log.md,
+   D/confirmed-facts.md, CLAUDE.md, .claude/commands/groom.md, .claude/agents/*.md<, P/retro.md if it exists>.
+   Write W/retro.md.
+   ```
+3. Do **not** act on the retro: change no agent, rule, artifact or log row because of it, and never pass `retro.md`
+   or `run-metrics.md` to another agent. They are for the PO.
+4. If this stage fails, say so in the summary. The package is still complete.
 Mark the run complete in run-state.json.
 
 ## Final message
-≤ 8 lines: the path to `W/final-prd.md` and its line count (`wc -l`), the verdict, the log summary, open or BLOCKING
-ids the PO must answer at grooming, how many questions went to the tech team, and one line listing the stage files.
+≤ 9 lines: the path to `W/final-prd.md` and its line count (`wc -l`), the verdict, the log summary, open or BLOCKING
+ids the PO must answer at grooming, how many questions went to the tech team, the path to `W/retro.md` with its
+top suggestion (the retro agent's reply, one line), and one line listing the stage files.
 Do not paste the package.

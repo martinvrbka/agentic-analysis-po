@@ -21,8 +21,11 @@ Read and follow as written:
 Both are non-interactive here: where they would ask, use the PRD and tag gaps 🔵 Open Question.
 
 ## Altitude and size (CLAUDE.md; these override the personas where they conflict)
-- **About 5–10 stories, each with 2–5 scenarios.** If you need more, the stories are too thin. Merge them, and
-  group several decisions into one scenario where they describe the same behaviour.
+- **Budget per the `Size:` tier (CLAUDE.md): small = 3–6 stories, 2–4 scenarios each, `user-stories.md` ≤ 120 lines;
+  standard = 5–10 stories, 2–5 scenarios each, ≤ 220 lines.** If you need more, the stories are too thin. Merge them,
+  and group several decisions into one scenario where they describe the same behaviour.
+- Write for a developer reading it for the first time: short Given/When/Then lines, concrete values, no restating
+  of the PRD. Items in PRD §8 Later get no story.
 - Scenarios describe what a user or an observer can see: screens, messages, files, permissions, limits. **No**
   endpoints, HTTP codes, headers, tokens, locks, databases or test harnesses. If a decision can only be expressed
   that way, it belongs to the technical team, not to a scenario.
@@ -31,11 +34,13 @@ Both are non-interactive here: where they would ask, use the PRD and tag gaps �
 
 ## Inputs
 This run's `prd-draft.md`, `decision-log.md`, `confirmed-facts.md`, and on a re-run the previous run's
-`user-stories.md` (keep its US ids).
+`user-stories.md` (keep its US ids). Do not claim anything about the log's state in the stories (e.g. "all rows
+are Resolved"); the log changes after you write.
 
 ## `user-stories.md`
 - Stable IDs `US-01`, `US-02`… On a re-run, keep existing IDs for stories that still exist. Do not renumber.
-- Each story: title; As a / I want to / so that; `Covers: DL-###, …`; Gherkin scenarios (`Scenario / Given / When /
+- Each story: title; As a / I want to / so that; `Covers: DL-###, …` (append ` (PO)` to ids whose Resolution
+  starts with `PO DECISION`, so the team sees which rules the PO decided and which are proposals); Gherkin scenarios (`Scenario / Given / When /
   Then`, with `And` as needed); and one INVEST line `INVEST: I ✓ | N ✓ | V ✓ | E ✗ (reason) | S ✓ | T ✓`.
 - **Every Resolved decision must be enforced by at least one scenario.** Accepted risks with a mitigation need a
   scenario that verifies the mitigation. A `Covers:` tag without a scenario that actually tests the decision does
@@ -47,9 +52,16 @@ This run's `prd-draft.md`, `decision-log.md`, `confirmed-facts.md`, and on a re-
 ## `story-map.md` (compact, ≤ 40 lines)
 - First line under the title: "_Proposal for discussion at grooming, not a commitment._"
 - One table: columns are the backbone activities, rows are release slices, and cells hold US ids.
-- Slices, at minimum: **Walking skeleton** (thinnest releasable end-to-end path), **Hardening** (failure handling,
-  limits, security), **Edge cases & polish**. Below the table, one line per slice: its release goal and what it lets
+- Slices: **Walking skeleton** (thinnest releasable end-to-end path), then **Hardening** (failure handling,
+  limits, security) and **Edge cases & polish** only if stories exist for them (tier `standard`: all three).
+  Tier `small`: ≤ 20 lines. Below the table, one line per slice: its release goal and what it lets
   the team learn.
+
+## Mode `revise` (orchestrator says `Mode: revise`)
+Inputs: your usual inputs plus the coverage report you are given. Edit `user-stories.md` in place (keep US ids) to
+fix every `GAP` row and every item under "Vague acceptance criteria": add or sharpen the scenario it names, or move
+a measurement step out of the ACs into the DoD-candidates section. Stay within the budget: merge or shorten other
+scenarios rather than growing the file. Do not touch `story-map.md` unless a story was merged away.
 
 ## Reply to the orchestrator
 At most 4 lines: story count, scenario count, stories with INVEST ✗, and stories blocked by open rows.

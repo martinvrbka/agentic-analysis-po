@@ -37,20 +37,28 @@ ROLES = {
     },
     "story-writer": {
         "read": ["personas/user-story/*", "personas/user-story-mapping/*", S + "confirmed-facts.md",
-                 R + "prd-draft.md", S + "decision-log.md", R + "user-stories.md"],
+                 R + "prd-draft.md", S + "decision-log.md", R + "user-stories.md", R + "story-map.md",
+                 R + "coverage-report*.md"],  # coverage report: revise mode only
         "write": [R + "user-stories.md", R + "story-map.md"],
     },
     "coverage-checker": {
         # Deliberately no PRD: it checks decisions against stories, not stories against intent.
         "read": ["personas/design-analysis-debate/SKILL.md", S + "decision-log.md", R + "user-stories.md",
                  R + "definition-of-done.md"],
-        "write": [R + "coverage-report.md"],
+        "write": [R + "coverage-report*.md"],  # coverage-report-1.md (first pass), coverage-report.md (final)
     },
     "packager": {
         "read": [R + "requirement.md", S + "confirmed-facts.md", R + "prd-draft.md", S + "decision-log.md",
                  R + "user-stories.md", R + "story-map.md", R + "business-case.md",
-                 R + "definition-of-done.md", R + "coverage-report.md"],
+                 R + "definition-of-done.md", R + "coverage-report*.md"],
         "write": [R + "business-case.md", R + "definition-of-done.md", R + "final-prd.md"],
+    },
+    "retro": {
+        # Runs after the package is built and sees everything, including designer rounds. Safe because no
+        # other role may read retro.md, so nothing it saw flows back into the debate.
+        "read": [R + "*.md", R + "rounds/*.md", S + "decision-log.md", S + "confirmed-facts.md",
+                 ".claude/commands/groom.md", ".claude/agents/*.md", "personas/*"],
+        "write": [R + "retro.md"],
     },
 }
 

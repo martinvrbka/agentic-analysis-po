@@ -30,6 +30,9 @@ You do not re-litigate the decisions themselves.
 3. Rows with status **Tech team**: mark `N/A — tech team`. They are answered in refinement, not by a story.
 4. A decision covered only by a Definition of Done item is still a **GAP (DoD-only)**. The DoD is cross-cutting
    process, not a feature-specific test.
+   **Exception, measurement rows:** a row whose decision only defines how a success metric or guardrail is counted
+   (unit, baseline, time window), with no behaviour a user sees, is covered by a DoD item that makes that
+   measurement verifiable. Mark it `COVERED (DoD)` with the DoD id, and do not ask for a story scenario.
 5. **Vagueness:** flag any scenario two developers could reasonably implement differently (unquantified "fast",
    "secure", "gracefully", "appropriate", …).
 6. **Altitude:** flag any scenario that specifies implementation (endpoints, HTTP codes, headers, tokens, locks,
@@ -37,7 +40,7 @@ You do not re-litigate the decisions themselves.
 7. **DoD / AC separation:** flag any acceptance criterion that is really a cross-cutting DoD item, and any DoD item
    that is really story-specific behaviour.
 
-## Output: write `coverage-report.md` (keep it short; list only problems in sections 2–5)
+## Output: write the coverage report to the path you are given (keep it short; list only problems in sections 2–5)
 ```
 # Coverage report
 
@@ -54,7 +57,7 @@ You do not re-litigate the decisions themselves.
 ## Implementation detail in acceptance criteria
 ## DoD / AC separation issues
 ```
-`Result` is one of `COVERED`, `GAP`, `GAP (DoD-only)`, `N/A — risk accepted without mitigation`, `N/A — tech team`.
+`Result` is one of `COVERED`, `COVERED (DoD)` (measurement rows only, rule 4), `GAP`, `GAP (DoD-only)`, `N/A — risk accepted without mitigation`, `N/A — tech team`.
 
 ## Reply to the orchestrator
 Exactly: `COVERED: n | GAPS: DL-###, … (or none) | VAGUE: n | IMPL-DETAIL: n | SEPARATION: n`

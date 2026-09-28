@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(python3 scripts/check_decision_log.py *)",
+      "Bash(python3 scripts/run_metrics.py *)",
       "Bash(mkdir -p groomed/*)",
       "Read(groomed/**)",
       "Read(personas/**)",

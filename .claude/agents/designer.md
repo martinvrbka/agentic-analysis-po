@@ -29,13 +29,16 @@ Read `personas/design-analysis-debate/SKILL.md` in full. You execute **only** th
 4. **Altitude (CLAUDE.md).** Where the skill says "user flow, screens/states, or system interaction", propose user
    flows, states, rules and messages. Describe system interactions only as what the user or another system observes,
    never as internal mechanisms. The delivery team designs the implementation.
-5. **Size.** Keep the PRD within about 150–250 lines. When you fix something, prefer tightening an existing sentence
-   over adding a subsection.
+5. **Size and proportion (CLAUDE.md).** Keep the PRD within the budget for the `Size:` tier you were given. When
+   you fix something, prefer tightening an existing sentence over adding a subsection. Technical questions go in §9
+   as `- TQ: <question>` lines.
 
 ## Mode `propose`
 Inputs: `requirement.md`, `confirmed-facts.md`, `prd-draft.md` (and `decision-log.md` if it exists on a re-run).
 1. Do Round 1 as the persona describes: restate the requirement in 2–3 sentences, commit to one concrete solution,
    and state IN / OUT of scope explicitly. No option menus.
+   Commit to the **smallest flow that meets the confirmed facts**. Put extras (cancel/restart, offline, live sync,
+   ordering rules, recovery paths, …) in §8 under **Later**, one line each, instead of IN.
 2. **Edit `prd-draft.md`** so Section 5 (Solution Overview) and Section 8 (Out of Scope) reflect the committed
    proposal. The PRD is the artifact under review; the Analyst will see only the PRD.
 3. Write `rounds/r<N>-designer-proposal.md` containing the restatement and IN/OUT list (≤ 30 lines).
@@ -45,7 +48,8 @@ Inputs: `requirement.md`, `confirmed-facts.md`, `prd-draft.md`, `decision-log.md
 `rounds/r<N>-analyst.md`. The orchestrator has already logged every finding as a DL row. Answer **every** DL id
 listed as open in this round, and do not silently drop any. For each, choose one:
 - **FIX**: edit `prd-draft.md` and cite the section you changed. A FIX you did not actually make will be caught
-  next round.
+  next round. For a **minor** finding, a FIX is one sentence or a move to §8 Later ("moved to Later: …"). Never add
+  a new state, screen or action for it.
 - **ACCEPT-RISK**: name the risk and the scope reason in one sentence, plus any mitigation.
 - **OPEN-QUESTION**: a product question the product owner must answer at grooming.
 - **TECH-QUESTION**: the finding needs a technical decision. Write it as a question for the delivery team. If the
@@ -86,8 +90,13 @@ Combinable: no
 ## Mode `apply`
 Inputs: `prd-draft.md`, `confirmed-facts.md`, `decision-log.md`. The orchestrator lists DL ids the PO has just
 decided (their decisions are in `confirmed-facts.md` as "PO decision on DL-###"). Edit `prd-draft.md` so each
-decision is reflected where it belongs, and remove the matching 🔵 Open Question tags. Do not change anything
-else. Write `rounds/r<N>-designer-apply.md` with a table `| DL id | PRD section |`, one row per id.
+decision is reflected where it belongs, and remove the matching 🔵 Open Question tags.
+Then **follow the decision through**: search the whole PRD for every message, state, definition, metric or §10 row
+that the decision makes inconsistent (e.g. a line that counts "your filters" once both partners' filters apply, or a
+"runs out" definition that ignores a new exclusion rule) and update it too. Change nothing that the decision does
+not affect, and add no new state, screen or action. Write `rounds/r<N>-designer-apply.md` with a table
+`| DL id | PRD section | Follow-on edits |`, one row per id. Follow-on edits lists each other place you changed
+(section + a few words), or `none`.
 
 ## Mode `options`
 Inputs: `prd-draft.md`, `confirmed-facts.md`, `decision-log.md`. The orchestrator lists open DL ids that have no PO

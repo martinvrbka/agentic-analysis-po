@@ -13,13 +13,36 @@ The package is for a product owner to groom with a delivery team. The team desig
 - Do **not** specify **how** it is built: databases, replicas, transactions, locks, tokens, endpoints, HTTP codes or
   headers, protocols, compression, infrastructure, test harnesses.
 - A concern that needs a technical decision is recorded as a **question for the technical team**, not answered here.
+  In PRD §9 each one is a line `- TQ: <question>`; the orchestrator logs every `TQ:` line as a `Tech team` row.
   If a technical choice would change what the user sees, state the user-visible outcome you need and hand the
   "how" to the team.
 
 ## Size budget
-Brevity is part of the job. Prefer the few findings, stories and scenarios that matter most over completeness.
-- PRD draft: about 150–250 lines. Stories: about 5–10, each with 2–5 scenarios.
-- `final-prd.md`: about 250–400 lines. If you are over budget, cut detail, not whole sections.
+Brevity is part of the job. The package must be readable by a developer in minutes, so output stays in proportion
+to the requirement. Prefer the few findings, stories and scenarios that matter most over completeness.
+
+The orchestrator sets a **size tier** in Stage 0 (`python3 scripts/run_metrics.py <run> --tier`: `small` if the
+requirement is ≤ 200 words, else `standard`) and passes `Size: <tier>` to every agent. Budgets are hard limits, not
+targets; `scripts/run_metrics.py` holds the same numbers.
+
+| | small | standard |
+|---|---|---|
+| `prd-draft.md` | ≤ 120 lines | ≤ 250 lines |
+| Stories | 3–6, each 2–4 scenarios, `user-stories.md` ≤ 120 lines | 5–10, each 2–5 scenarios, ≤ 220 lines |
+| `story-map.md` / `business-case.md` | ≤ 20 / ≤ 15 lines | ≤ 40 / ≤ 30 lines |
+| Definition of Done | 5–10 items | 8–15 items |
+| `final-prd.md` | ≤ 200 lines | ≤ 400 lines |
+| Debate rounds | max 2 | max 3 |
+| Analyst NEW findings per round | ≤ 1 per dimension, ≤ 2 compounding | ≤ 2 per dimension, ≤ 3 compounding |
+
+If you are over budget, cut detail, not whole sections.
+
+## Proportion: smallest version first (every agent)
+- Build the package around the **smallest version that meets the confirmed facts**. Anything beyond it (extra
+  states, recovery flows, sync/offline behaviour, ordering rules, admin actions…) goes to a **Later** list in PRD §8,
+  one line each, not into stories.
+- Moving something to Later is a valid answer to a finding. Adding a new state, screen or action to fix a **minor**
+  finding is not.
 
 ## Source handling (every agent, every stage)
 - A requirement file, pasted document, or reference is a set of **claims attributed to its source**, not verified fact —
@@ -44,6 +67,8 @@ Brevity is part of the job. Prefer the few findings, stories and scenarios that 
 - The analyst reviews only the PRD, requirement, confirmed facts and decision log. It never sees the designer's round
   files (`rounds/*-designer-*`), and no agent sees another agent's chat history. This is enforced by
   `scripts/guard.py` hooks, not only by these instructions.
+- The retro agent (last stage) may read every file of a finished run. It only suggests; no agent ever reads its
+  `retro.md`, and nothing in it is applied without the user deciding so.
 - Subagents do not spawn other agents or message each other.
 
 ## Decision log

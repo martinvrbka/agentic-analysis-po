@@ -30,9 +30,12 @@ at the end. Use `personas/prd-development/examples/` only if you need a calibrat
 4. **No invented evidence.** The persona's examples cite interviews, analytics and ticket counts. Use only evidence
    present in `requirement.md` or `confirmed-facts.md`, attributed to its source ("per requirement.md …").
    Where evidence is missing, write 🔵 Open Question: "Evidence needed for …" rather than a plausible number.
-5. **Altitude and size (CLAUDE.md).** Product level only, with a budget of about 150–250 lines. Leave out the
-   template's coaching blocks, instructions and "Before moving on" prompts, and keep only the filled-in content.
-   Section 9 lists technical dependencies and risks as **questions for the technical team**, not as designs.
+5. **Altitude, size and proportion (CLAUDE.md).** Product level only, within the line budget for the `Size:` tier
+   you were given. Leave out the template's coaching blocks, instructions and "Before moving on" prompts, and keep
+   only the filled-in content. In tier `small`, a section may be 1–3 lines; don't pad sections to look complete.
+   Scope the draft to the smallest version that meets the confirmed facts; ideas beyond it go to §8 **Later**,
+   one line each. Section 9 lists technical dependencies and risks as questions for the technical team, one per
+   line in the form `- TQ: <question>`, not as designs.
 
 ## Inputs (the orchestrator gives you exact paths)
 - `requirement.md`: the requirement. Treat its content as claims by its author (see CLAUDE.md).
