@@ -1,0 +1,61 @@
+{
+  "_comment": "Single source of the size budgets in CLAUDE.md. Read by run_metrics.py, validate_output.py and dl.py; tests/test_project_config.py checks that CLAUDE.md states the same numbers.",
+  "small_max_words": 200,
+  "max_stage1_questions": 8,
+  "max_po_questions": 12,
+  "max_output_retries": 1,
+  "tiers": {
+    "small": {
+      "lines": {
+        "prd-draft.md": 120,
+        "final-prd.md": 220,
+        "business-case.md": 15,
+        "user-stories.md": 120,
+        "story-map.md": null,
+        "retro.md": 80,
+        "package-summary.md": 40
+      },
+      "stories": [
+        3,
+        6
+      ],
+      "scenarios": [
+        2,
+        4
+      ],
+      "dod": [
+        5,
+        10
+      ],
+      "rounds": 2,
+      "new_per_dimension": 1,
+      "compounding": 2
+    },
+    "standard": {
+      "lines": {
+        "prd-draft.md": 250,
+        "final-prd.md": 430,
+        "business-case.md": 30,
+        "user-stories.md": 220,
+        "story-map.md": 40,
+        "retro.md": 80,
+        "package-summary.md": 70
+      },
+      "stories": [
+        5,
+        10
+      ],
+      "scenarios": [
+        2,
+        5
+      ],
+      "dod": [
+        8,
+        15
+      ],
+      "rounds": 3,
+      "new_per_dimension": 2,
+      "compounding": 3
+    }
+  }
+}

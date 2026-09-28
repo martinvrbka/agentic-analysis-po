@@ -1,18 +1,21 @@
 {
   "permissions": {
     "allow": [
+      "Bash(python3 scripts/dl.py *)",
       "Bash(python3 scripts/check_decision_log.py *)",
       "Bash(python3 scripts/run_metrics.py *)",
-      "Bash(mkdir -p groomed/*)",
+      "Bash(python3 scripts/validate_output.py *)",
+      "Bash(python3 -m unittest *)",
       "Read(groomed/**)",
-      "Read(personas/**)",
-      "Edit(groomed/**)"
+      "Read(personas/**)"
     ]
   },
-  "hooks": {
+  "hooks": {"PreToolUse": [{"matcher": "Read|Write|Edit|Bash|Glob|Grep",
+  "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/guard.py\" --auto"}]}],
+
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|Bash",
         "hooks": [
           {
             "type": "command",

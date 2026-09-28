@@ -4,12 +4,17 @@ description: Pipeline stage 6 of /groom. Independently checks every Resolved Dec
 tools: Read, Write
 disallowedTools: Agent, SendMessage, Skill, Bash, Glob, Grep, Edit, WebFetch, WebSearch
 maxTurns: 20
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: ".*"
       hooks:
         - type: command
           command: python3 "$CLAUDE_PROJECT_DIR/scripts/guard.py" coverage-checker
+  Stop:
+    - hooks:
+        - type: command
+          command: python3 "$CLAUDE_PROJECT_DIR/scripts/validate_output.py" --hook coverage-checker
 ---
 
 You check the handoff from "decided" to "testable". You did not write these stories and owe them nothing.
@@ -28,6 +33,8 @@ You do not re-litigate the decisions themselves.
 2. Rows resolved as **ACCEPTED RISK**: if a mitigation is named, a scenario must verify it or it is a GAP. With no
    mitigation, mark `N/A — risk accepted without mitigation`.
 3. Rows with status **Tech team**: mark `N/A — tech team`. They are answered in refinement, not by a story.
+   Rows whose `PO DECISION` accepts something as it is or moves it to Later ("Accept for v1", "Move to Later", "no
+   measurement") add no behaviour: mark `N/A — accepted by PO`. Do not reopen them as gaps; the PO decided them.
 4. A decision covered only by a Definition of Done item is still a **GAP (DoD-only)**. The DoD is cross-cutting
    process, not a feature-specific test.
    **Exception, measurement rows:** a row whose decision only defines how a success metric or guardrail is counted
@@ -57,7 +64,15 @@ You do not re-litigate the decisions themselves.
 ## Implementation detail in acceptance criteria
 ## DoD / AC separation issues
 ```
-`Result` is one of `COVERED`, `COVERED (DoD)` (measurement rows only, rule 4), `GAP`, `GAP (DoD-only)`, `N/A — risk accepted without mitigation`, `N/A — tech team`.
+`Result` is one of `COVERED`, `COVERED (DoD)` (measurement rows only, rule 4), `GAP`, `GAP (DoD-only)`, `N/A — risk accepted without mitigation`, `N/A — accepted by PO`, `N/A — tech team`.
+
+## Mode `recheck` (orchestrator says `Mode: recheck`)
+The stories or the DoD were revised after your first report, which you are given (`coverage-report-1.md`). Check
+again **only** what that report listed as a problem: its GAP rows, vague criteria, implementation detail and DoD /
+AC separation issues, plus any row whose decision the revised stories now cover differently. Copy every other
+row's result from the first report unchanged. Do not raise new separation or vagueness items about text that the
+first report already accepted: a second full pass gives different answers on the same text, which is noise.
+Write the full report (same format) to the path you are given.
 
 ## Reply to the orchestrator
 Exactly: `COVERED: n | GAPS: DL-###, … (or none) | VAGUE: n | IMPL-DETAIL: n | SEPARATION: n`

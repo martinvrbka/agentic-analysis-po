@@ -2,63 +2,72 @@
 description: Run the requirement → PRD → isolated Designer/Analyst debate → stories → coverage → grooming-package → retro pipeline
 argument-hint: <requirement-file.md>
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Agent, AskUserQuestion, Bash(python3 scripts/check_decision_log.py *), Bash(python3 scripts/run_metrics.py *), Bash(mkdir *), Bash(ls *), Bash(date *), Bash(diff *), Bash(wc *)
+allowed-tools: Read, Agent, SendMessage, ToolSearch, AskUserQuestion, Bash(python3 scripts/dl.py *), Bash(python3 scripts/check_decision_log.py *), Bash(python3 scripts/run_metrics.py *), Bash(python3 scripts/validate_output.py *), Bash(ls *), Bash(diff *), Bash(wc *)
 ---
 
 You are the **orchestrator** of the grooming pipeline. Requirement file: `$ARGUMENTS`
 
-You coordinate; you do not author. You write only `requirement.md`, `confirmed-facts.md`, `decision-log.md` and
-`.state/run-state.json`. Every other artifact is written by a subagent, except `run-metrics.md`, which
-`scripts/run_metrics.py` writes.
+You coordinate; you do not author. **All bookkeeping goes through `python3 scripts/dl.py`** (run setup, run state,
+confirmed facts, decision log). Never edit `decision-log.md`, `confirmed-facts.md`, `requirement.md` or
+`.state/*` yourself, by any tool: `dl.py` validates every log write and rolls back invalid ones, and a hook re-checks
+the log after every Bash call. Every other artifact is written by a subagent, except `run-metrics.md`
+(`run_metrics.py`). If a `dl.py` command fails, report it to the user; do not work around it.
 
 ## Paths
-- `D = groomed/<slug>`: shared across runs. Holds `decision-log.md`, `confirmed-facts.md`, `.state/`.
-- `W = D/run-<k>_<YYYY-MM-DD>`: this run's folder. Everything else this run produces goes here.
-- `P`: the previous run's folder (re-runs only). It is read-only: never write into it.
+`dl.py start` prints them: `D = groomed/<slug>` (shared across runs: log, facts, `.state/`), `W = D/run-<k>_<date>`
+(this run), `P` = the previous run's folder (re-runs only; read-only). `start` also pins the run in
+`groomed/.active-run.json`; the guard lets agents touch only that feature and run. `state complete` removes the pin.
 
 ## Isolation rules for you (the main way isolation could break is through you)
 - Spawn every worker with the **Agent** tool using its `subagent_type` and the **exact prompt template** given below.
   Fill in only paths, round numbers, modes and the size tier. **Every** agent prompt starts with the line
-  `Size: <tier>.` (from run-state.json). **Never** add summaries, quotes, opinions or hints drawn from another
-  agent's output, and never tell an agent what a previous round "was worried about". Paths only.
-- A **new** Agent call for every designer and analyst turn. Never resume or message a previous instance.
-- The guard hooks will block workers from files outside their allowlist. If a worker reports a guard block, do not
-  work around it; report it to the user.
+  `Size: <tier>.`. **Never** add summaries, quotes, opinions or hints drawn from another agent's output, and never
+  tell an agent what a previous round "was worried about". Paths only.
+- A **new** Agent call for every designer and analyst turn. Never resume or message a previous instance, except
+  for the output check below.
+- If a worker reports a guard block, do not work around it; report it to the user.
+
+## Output check (after every agent, including parallel ones)
+Some clients do not run the Stop hook in the agent files, so you run the same check yourself:
+1. `python3 scripts/validate_output.py --after <role> <files it wrote, relative to W>` (e.g. `--after analyst
+   rounds/r2-analyst.md`, `--after packager business-case.md`). `OK` → go on.
+2. Otherwise send the printed problems, and nothing else, to **the same agent** with SendMessage (load it once with
+   ToolSearch `select:SendMessage`): `Fix exactly these problems in <files>, then finish again:` + the lines as printed.
+   This is the only time you message an earlier agent; the text is script output, never another agent's words.
+3. When it finishes, run the command again with `--record`. Whatever it still prints goes to
+   `D/.state/validation-warnings.log`; mention it in the stage summary. One fix round only.
+Do this before any `dl.py` command that reads the agent's file.
 
 ## Per-stage summaries
-After each stage, print **at most 3 lines** in this form, and never file contents:
-`✔ Stage <n> · <name> — <what happened>` followed by the file(s) written and, where relevant,
-the output of `python3 scripts/check_decision_log.py D/decision-log.md --summary`.
-After Stages 2, 3, 5 and 7, also add the output of `python3 scripts/run_metrics.py W --check <file>` for the file
-the stage wrote (`prd-draft.md`, `user-stories.md`, `final-prd.md`). If it says OVER, say so plainly in the summary.
+`dl.py` prints decision-log ids with their names (`DL-007 do-not-eat-blocks-matches`). Use that form whenever you
+mention an id to the user; a bare `DL-007` tells the PO nothing.
+After each stage, print **at most 3 lines**: `✔ Stage <n> · <name> — <what happened>`, the file(s) written and, where
+relevant, `python3 scripts/dl.py summary`. After Stages 2, 3, 5 and 7 add `python3 scripts/run_metrics.py W --check
+<file>` for `prd-draft.md`, `user-stories.md`, `final-prd.md`. If it says OVER, say so plainly.
+Then `python3 scripts/dl.py state stage=<n>`.
 
 ## PO checkpoint (procedure used in Stage 3 and Stage 4)
 The product owner answers open product questions live, so stories are built on decisions instead of gaps.
-Input: a set of DL ids, each with a prepared block under `## Questions for the PO` in a designer file.
-1. **Pick at most 4**: BLOCKING rows first, then in log order. Any others wait for the next checkpoint.
-2. Ask them in **one** AskUserQuestion call, one question per DL id, copying the designer's text as is:
-   - `header`: the DL id. `question`: the designer's Question line.
-   - `options`: the recommended option first with ` (Recommended)` appended to its label, then the other options
-     (label = text before ` — `, description = text after it), then **`Leave for grooming`** (description:
-     "Keep it open and discuss it with the team"). Stay within 4 options: if the designer gave 3, drop the
-     least-preferred non-recommended one.
-   - `multiSelect`: true only if the block says `Combinable: yes`.
-   - The user can always choose Other and type their own answer. Treat that as the decision, word for word.
-   - **An Other answer that points to another source** (a file, folder or earlier feature, e.g. "see the foodie-match
-     folder"): read that source yourself. Pick at most 3 claims from it that answer this DL question, quoted as
-     written. Ask the PO to confirm them in the **next** AskUserQuestion call (one question, `multiSelect: true`,
-     one option per claim, plus `None of these`). Only the claims the PO ticks become the decision:
-     `PO decision on DL-###: <ticked claims> (per <source>)`. If none are ticked, the row stays Still Open and is
-     asked again with the designer's options. Never pass the source's path to an agent instead.
+1. `python3 scripts/dl.py ask <ids…>` with at most 4 ids, BLOCKING first, then in log order. It returns the
+   AskUserQuestion JSON built from the designer's question blocks (recommended option first, `Leave for grooming`
+   last) and enforces the per-run question cap. Ids it lists under `over_cap_defer`: run
+   `dl.py defer <id> --cap` and do not ask them. If it says `cap_reached`, defer all of them the same way.
+2. Ask the returned questions in **one** AskUserQuestion call, exactly as returned, without the `dl_id` key (it tells
+   you which DL id each question belongs to; the header is a short topic, not the id).
 3. For each answer:
-   - **Decided**: append `- PO decision on DL-###: <answer> (confirmed by user, /groom run <k>, <label>)` to
-     `D/confirmed-facts.md`. Set the row to Resolved, Resolution `PO DECISION: <answer> · prev: <old>`.
-   - **Leave for grooming**: keep Still Open (or BLOCKING), and append ` · deferred to grooming by PO` to its
-     Resolution. Never ask about that id again in this run.
+   - an option or the user's own text: `dl.py decide <id> <label> "<answer as shown or typed, word for word>"`
+     (label = `run<k>-R<N>` or `run<k>-RF`). For a multi-select answer, join the chosen options with ` AND `.
+     `decide` stores the chosen option together with its consequence line, so exact wording the PO saw is kept.
+   - `Leave for grooming`: `dl.py defer <id>`. Never ask about that id again in this run.
+   - **Other text that points to another source** (a file, folder or earlier feature): read that source yourself,
+     pick at most 3 claims from it that answer this DL question, quoted as written, and ask the PO to confirm them in
+     the **next** AskUserQuestion call (`multiSelect: true`, one option per claim, plus `None of these`). Record only
+     the ticked claims: `dl.py decide <id> <label> "<ticked claims> (per <source>)"`. None ticked: the row stays
+     open and is asked again with the designer's options. Never pass the source's path to an agent.
 4. If anything was decided, spawn a **fresh** Agent `designer`:
    ```
    Mode: apply. Round: <N or F>. Run folder: W.
-   Read W/prd-draft.md, D/confirmed-facts.md, D/decision-log.md.
+   Read W/prd-draft.md, context/product-context.md, D/confirmed-facts.md, D/decision-log.md.
    Apply PO decisions for: <decided DL ids>.
    Edit W/prd-draft.md. Write W/rounds/r<N or F>-designer-apply.md.
    ```
@@ -67,51 +76,43 @@ Input: a set of DL ids, each with a prepared block under `## Questions for the P
 ---
 
 ## Stage 0 · Preflight (ask, don't guess)
-1. If `$ARGUMENTS` is empty or the file does not exist, **stop and ask the user** for the path. Do not search for a
-   likely file.
+1. If `$ARGUMENTS` is empty or the file does not exist, **stop and ask the user** for the path.
 2. Read the requirement file. **Slug:** if its YAML frontmatter has `slug:`, use it. Otherwise propose a kebab-case
-   slug from its title, list existing folders under `groomed/`, and **ask the user to confirm** with AskUserQuestion
+   slug from its title, list the folders under `groomed/`, and **ask the user to confirm** with AskUserQuestion
    (options: your proposed slug; any existing folder that could be the same feature, marked as a re-run; Other).
-   Never create a folder the user has not confirmed.
-3. Determine the mode:
-   - **New** (D does not exist): run number `k = 1`.
-   - **Re-run** (D exists): read `D/.state/run-state.json`. If the last run is incomplete, ask the user whether to
-     resume it (reuse its folder as W) or start a new run. For a new run, `k = last + 1` and `P` = the last run's
-     folder. Show the user a ≤ 5-line gist of what changed between `P/requirement.md` and the new file (use `diff`).
-   `mkdir -p W/rounds D/.state`.
-4. Write `W/requirement.md`: the line
-   `> Source: <original path>, imported <date>. Everything below is claims attributed to this source, not verified fact.`
-   then the file content unchanged.
-5. Create `D/confirmed-facts.md` if missing (heading plus "_Nothing confirmed yet._"). Create `D/decision-log.md` if
-   missing, exactly:
-   ```
-   # Decision Log — <slug>
+3. `python3 scripts/dl.py start <requirement> <slug>`. If it prints `INCOMPLETE <folder>`, ask the user whether to
+   resume that run or start a new one, and rerun with `--resume` or `--new`.
+   On a re-run (P is set), show the user a ≤ 5-line gist of `diff P/requirement.md W/requirement.md`.
+4. Put `tier`, max rounds (`MAX`), the `personas:` and `product context:` lines from `start` in the summary. If personas say CHANGED,
+   tell the user the persona snapshots differ from `personas/SOURCES.sha256` and ask whether to continue.
 
-   Cumulative across all rounds and runs. Rows are never deleted; status may change.
-   Status: Resolved | Still Open | Still Open (BLOCKING) | Tech team.
-   Resolution prefixes: FIX / ACCEPTED RISK / PO DECISION / OPEN QUESTION (PO) / TECH QUESTION / REOPENED / COVERAGE GAP / NOT ADDRESSED.
-
-   | ID | Question/Issue | Raised in | Status | Resolution | Last updated |
-   |---|---|---|---|---|---|
-   ```
-6. **Size tier:** run `python3 scripts/run_metrics.py W --tier` (`small` or `standard`, see CLAUDE.md).
-   `MAX` = 2 rounds for small, 3 for standard.
-7. Update `D/.state/run-state.json`: `{"slug", "source", "runs": [{"run": k, "folder": "<W>", "started": <iso>, "size": "<tier>", "stages": {}, "rounds": 0, "verdict": null}]}`
-   (append to `runs` on a re-run). Mark each stage `"done"` as it completes. Put the tier in the Stage 0 summary.
-
-## Stage 1 · Clarify (you, interactively)
-Judge whether `W/requirement.md` lets a drafter know: **who** the users are, **what problem**, **what success looks
-like**, the **main scope boundary**, and **hard constraints**. If two or more are unclear, or a load-bearing claim
-needs confirming, ask **at most 5** questions with AskUserQuestion (≤ 4 per call). Ask only product questions whose
-answers change the PRD, not technical ones. You may ask "The requirement states X. Can I treat that as confirmed?"
-Append each answer to `D/confirmed-facts.md` as `- <fact> (confirmed by user, /groom run <k>, <date>)`.
-If the requirement is clear, skip the questions and say so in the summary. On a re-run, ask only about what changed.
+## Stage 1 · Clarify and business context (you, interactively)
+Ask **at most 8** questions in total with AskUserQuestion (≤ 4 per call), product and business only, never technical.
+Skip any question `D/confirmed-facts.md` already answers; on a re-run, ask only about what changed.
+1. **Product (call 1):** scan `W/requirement.md`, `context/product-context.md` and `D/confirmed-facts.md` against
+   these 10 product-level areas and mark each Clear / Partial / Missing: scope and goal · users and roles · user flow
+   and error states · data the user sees or keeps · limits users notice (speed, size, availability) · dependencies on
+   other products or teams · edge cases · constraints (deadline, budget, compliance, platform) · terms · what counts
+   as done. Ask about the Missing or Partial areas whose answer would most change the PRD. You may ask "The
+   requirement states X. Can I treat that as confirmed?" Put the scan in the summary as one line:
+   `Missing: … · Partial: …`.
+2. **Business context (call 2, always unless already confirmed):** the drafter and the business case need these, and
+   runs without them ended with "value not quantified" and no "why now". Ask, with 2–3 concrete options each built
+   from the requirement (the user can always type their own):
+   - **Business goal:** what should change for the business (e.g. retention, time saved, revenue, cost)?
+   - **Success measure and today's level:** which number shows success, and roughly where is it today (or unknown)?
+   - **Why now:** deadline, event, competitor, customer demand, or no urgency?
+   - **Size of the problem / priority:** how many users or how often, and how important versus other work?
+   Replace a question with a more relevant one (e.g. budget, stakeholders, compliance) if the requirement makes it moot.
+Skip what `context/product-context.md` already states. Record each answer with `dl.py fact "<fact>"`, in the user's
+words (feature facts; the PO moves product-wide ones into the product context by hand if they want). An answer of "unknown" is a fact too
+("Baseline for X is unknown"); it tells the drafter to tag the gap instead of inventing a number.
 
 ## Stage 2 · Draft PRD
 Agent `prd-drafter`, prompt:
 ```
 Mode: <create | update>. Run folder: W.
-Read W/requirement.md, D/confirmed-facts.md<, P/prd-draft.md, D/decision-log.md if update>.
+Read W/requirement.md, context/product-context.md, D/confirmed-facts.md<, P/prd-draft.md, D/decision-log.md if update>.
 Write W/prd-draft.md.
 ```
 
@@ -119,88 +120,77 @@ Write W/prd-draft.md.
 **Round 1 only, first:** Agent `designer`, prompt:
 ```
 Mode: propose. Round: 1. Run folder: W.
-Read W/requirement.md, D/confirmed-facts.md, W/prd-draft.md<, D/decision-log.md if it has rows>.
+Read W/requirement.md, context/product-context.md, D/confirmed-facts.md, W/prd-draft.md<, D/decision-log.md if it has rows>.
 Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
 ```
 **Each round N = 1..MAX:**
 1. Agent `analyst`, prompt:
    ```
    Mode: review. Round: <N>. Run folder: W. <First review of this draft: yes — if N = 1>
-   Read W/requirement.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md.
+   Read W/requirement.md, context/product-context.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md.
    Write W/rounds/r<N>-analyst.md.
    ```
-2. **Log the findings** from `W/rounds/r<N>-analyst.md`. You are transcribing, not editing:
-   - each `NEW` finding and each compounding risk becomes a new row with id from
-     `python3 scripts/check_decision_log.py D/decision-log.md --next-id`. Question/Issue = `[<Dimension>] <Finding>`
-     (compounding: `[Compounding DL-a × DL-b] …`). Raised in = `R`. Status = `Still Open (BLOCKING)` if severity is
-     blocking, else `Still Open`. Resolution = `—`. Last updated = `R`.
-   - each `REOPEN DL-x`: set Status to Still Open (or BLOCKING), Resolution = `REOPENED R: <reason> · prev: <old resolution>`.
-   - Never change an existing row's Question/Issue text. The PostToolUse hook rejects writes that drop or reword
-     rows; if it fires, fix the log and do not bypass it.
-3. Summary: verdict, new/reopened/blocking counts, log summary line.
-4. If `VERDICT: READY FOR GROOMING`: with `NEW_ISSUES: 0`, **exit the loop** now. Otherwise (only minor findings
-   remain) run steps 5–8 once for them, then **exit the loop** with no further analyst turn.
+2. `dl.py findings W/rounds/r<N>-analyst.md R`. It logs every NEW finding and compounding risk and applies every
+   REOPEN, and prints the ids to respond to.
+3. Summary: verdict, the `findings` output line, `dl.py summary`.
+4. If `VERDICT: READY FOR GROOMING` with `NEW_ISSUES: 0`, **exit the loop** now. If READY with only minor findings,
+   run steps 5–8 once for them, then **exit the loop** with no further analyst turn.
 5. Agent `designer` (a fresh one), prompt:
    ```
    Mode: respond. Round: <N>. Run folder: W.
-   Read W/requirement.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md, W/rounds/r<N>-analyst.md.
-   Respond to these DL ids: <comma-separated ids opened or reopened in this round>.
+   Read W/requirement.md, context/product-context.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md, W/rounds/r<N>-analyst.md.
+   Respond to these DL ids: <the "respond to" ids from step 2>.
    Edit W/prd-draft.md. Write W/rounds/r<N>-designer-response.md.
    ```
-6. **Log the dispositions** from `W/rounds/r<N>-designer-response.md`:
-   `FIX` → Resolved, `FIX: <resolution> (<§>)` · `ACCEPT-RISK` → Resolved, `ACCEPTED RISK: <resolution>` ·
-   `OPEN-QUESTION` → Still Open (keep BLOCKING if it was), `OPEN QUESTION (PO): <question>` ·
-   `TECH-QUESTION` → Tech team, `TECH QUESTION: <question>`. Last updated = `R`.
-   Any id you asked about that has no row in the response → Still Open, `NOT ADDRESSED R · prev: <old>`.
-   Nothing is silently dropped.
-7. Summary: FIX / ACCEPT-RISK / OPEN-QUESTION / TECH-QUESTION counts and the log summary line.
-8. **PO checkpoint** for this round's OPEN-QUESTION ids plus any still queued from earlier rounds (their question
-   blocks are in `W/rounds/r<N>-designer-response.md` or earlier response files).
+6. `dl.py dispositions W/rounds/r<N>-designer-response.md R <the same ids>`. Ids without an answer are marked
+   NOT ADDRESSED; nothing is silently dropped.
+7. Summary: its counts line and `dl.py summary`.
+8. **PO checkpoint** for this round's open-question ids plus any still queued from earlier rounds.
 9. If N = MAX and the verdict was not READY, run a **closing** Agent `analyst`, prompt:
    ```
    Mode: closing. Round: F. Run folder: W.
-   Read W/requirement.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md.
+   Read W/requirement.md, context/product-context.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md.
    Write W/rounds/rF-analyst.md.
    ```
-   Log its findings as in step 2 with `R = run<k>-RF`. They stay open for grooming, with no further designer turn.
-Record `rounds` and the final `verdict` in run-state.json.
+   `dl.py findings W/rounds/rF-analyst.md run<k>-RF --closing`. Major and blocking closing findings are asked
+   in Stage 4; minor ones are parked as "proposed: accept or Later" and asked at the last checkpoint (Stage 7).
+Then `dl.py state rounds=<N> "verdict=<final verdict>"`.
 
 ## Stage 4 · Final PO checkpoint and decision log check
-1. **Tech questions.** Read the `- TQ: <question>` lines in §9 of `W/prd-draft.md`. For each whose question text
-   is not already in a log row, add a row: Question/Issue = `[Tech] <question>`, Raised in = `run<k>-TQ`,
-   Status = `Tech team`, Resolution = `TECH QUESTION: <question>`, Last updated = `run<k>-TQ`. (Transcription only.)
-   **PRD open questions.** Read the table in §10 of `W/prd-draft.md`. For each row whose Status is `Open`, whose
-   Owner includes `PO`, which cites no DL id, and whose question text is not already in a log row, add a row:
-   Question/Issue = `[PRD §10] <question>`, Raised in = `run<k>-OQ`, Status = `Still Open`, Resolution = `—`,
-   Last updated = `run<k>-OQ`. (Transcription only.) They go through steps 2–4 like any other open row.
-2. Collect every row that is Still Open or BLOCKING, is not `Tech team`, and was not deferred to grooming.
-3. For those without a prepared question block (e.g. from the closing review, NOT ADDRESSED, or reopened rows),
-   spawn a fresh Agent `designer`:
+1. `dl.py import-prd`: logs every §9 `- TQ:` line as a Tech team row and every open PO row of §10 as a Still Open row.
+2. `dl.py open` lists the ids to ask and those without a question block. For the latter, spawn a fresh Agent
+   `designer`:
    ```
    Mode: options. Run folder: W.
-   Read W/prd-draft.md, D/confirmed-facts.md, D/decision-log.md.
+   Read W/prd-draft.md, context/product-context.md, D/confirmed-facts.md, D/decision-log.md.
    Prepare PO questions for: <ids>.
    Write W/rounds/rF-designer-options.md.
    ```
-   Ids it marks `TECH-QUESTION` → status Tech team, `TECH QUESTION: <question> · prev: <old>`.
-4. Run the **PO checkpoint** repeatedly, 4 questions at a time, until every collected id is decided or deferred.
-   This is the last chance before stories are written, so nothing stays queued.
-5. Run `python3 scripts/check_decision_log.py D/decision-log.md` (it must print OK). Summary: the final verdict, the
-   log summary line, the ids of BLOCKING rows, the ids deferred to grooming and the number of tech questions.
+   then `dl.py options W/rounds/rF-designer-options.md run<k>-RF` (ids it marked TECH-QUESTION go to the tech team).
+3. Run the **PO checkpoint** repeatedly, 4 at a time, until `dl.py open` lists nothing. This is the last chance
+   before stories are written.
+4. `python3 scripts/check_decision_log.py D/decision-log.md` must print OK. Summary: the final verdict, the log
+   summary, BLOCKING ids, deferred ids and the number of tech questions.
 
-## Stage 5 · User stories
+## Stage 5 · User stories and business case (two agents in parallel)
 Agent `story-writer`, prompt:
 ```
-Run folder: W. Read W/prd-draft.md, D/decision-log.md, D/confirmed-facts.md<, P/user-stories.md if it exists (keep US ids)>.
-Write W/user-stories.md and W/story-map.md.
+Run folder: W. Read W/prd-draft.md, D/decision-log.md, context/product-context.md, D/confirmed-facts.md<, P/user-stories.md if it exists (keep US ids)>.
+Write W/user-stories.md<, and W/story-map.md if tier standard>.
+```
+In the same message, Agent `packager` (the business case does not depend on the stories), prompt:
+```
+Mode: business-case. Run folder: W.
+Read W/requirement.md, context/product-context.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md.
+Write W/business-case.md.
 ```
 
 ## Stage 6 · Coverage check and story revision
 1. Agent `packager`, prompt:
    ```
-   Mode: prep. Run folder: W.
-   Read W/requirement.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md, W/user-stories.md.
-   Write W/business-case.md and W/definition-of-done.md.
+   Mode: dod. Run folder: W.
+   Read D/decision-log.md, W/user-stories.md, W/prd-draft.md.
+   Write W/definition-of-done.md.
    ```
 2. Agent `coverage-checker`, prompt:
    ```
@@ -208,55 +198,96 @@ Write W/user-stories.md and W/story-map.md.
    Write W/coverage-report-1.md.
    ```
 3. If the report has **no** `GAP` row, no "Vague acceptance criteria" items and no "DoD / AC separation issues"
-   that name a DoD item, it is final: `COV = W/coverage-report-1.md`. Otherwise:
-   - if it has a GAP row or vague items, spawn a fresh Agent `story-writer`, prompt:
+   that name a DoD item, it is final: `COV = W/coverage-report-1.md`. Otherwise run these (in parallel when both
+   apply; they edit different files):
+   - GAP rows or vague items → a fresh Agent `story-writer`, prompt:
      ```
-     Mode: revise. Run folder: W. Read W/prd-draft.md, D/decision-log.md, D/confirmed-facts.md, W/user-stories.md, W/coverage-report-1.md.
+     Mode: revise. Run folder: W. Read W/prd-draft.md, D/decision-log.md, context/product-context.md, D/confirmed-facts.md, W/user-stories.md, W/coverage-report-1.md.
      Edit W/user-stories.md.
      ```
-   - if it names a DoD item under "DoD / AC separation issues", spawn a fresh Agent `packager`, prompt:
+   - a DoD item named under "DoD / AC separation issues" → a fresh Agent `packager`, prompt:
      ```
-     Mode: prep. Only: definition-of-done.md. Run folder: W.
+     Mode: dod-fix. Run folder: W.
      Read D/decision-log.md, W/user-stories.md, W/definition-of-done.md, W/coverage-report-1.md.
      Edit W/definition-of-done.md.
      ```
-   then a fresh Agent `coverage-checker` with the prompt from step 2 but `Write W/coverage-report.md.`
+   then a fresh Agent `coverage-checker` (it rechecks only what the first report flagged), prompt:
+   ```
+   Mode: recheck. Run folder: W. Read D/decision-log.md, W/user-stories.md, W/definition-of-done.md, W/coverage-report-1.md.
+   Write W/coverage-report.md.
+   ```
    (`COV = W/coverage-report.md`). No further revision after this second check.
-4. For every `GAP` / `GAP (DoD-only)` row in `COV`: set that DL row to Still Open with
-   `COVERAGE GAP run<k>: <what a scenario must assert> · prev: <old resolution>`, Last updated = `run<k>-coverage`.
-   This applies even if the row was Resolved.
-5. **Unlogged story questions.** For each `🔵 Open Question` line in `W/user-stories.md` and each item still under
-   "Vague acceptance criteria" in `COV` whose text is not already in a log row, add a row: Question/Issue =
-   `[Stories] <US id>: <question or vague item, as written>`, Raised in = `run<k>-stories`, Status = `Still Open`,
-   Resolution = `—`, Last updated = `run<k>-stories`. (Transcription only.) The package then lists them in §6 with
-   every other open row, so nothing open stays outside the log.
+4. `dl.py gaps COV`: every GAP row is reopened as COVERAGE GAP, even if it was Resolved.
+5. `dl.py import-stories COV`: every 🔵 line in the stories and every leftover vague or DoD-separation item becomes a
+   Still Open row, so nothing open stays outside the log.
 6. Summary: gaps / vague counts of the first check → of the final check, implementation-detail / separation counts,
-   the `--check user-stories.md` line and the log summary line.
+   the `--check user-stories.md` line and `dl.py summary`.
 
-## Stage 7 · Grooming package
-Agent `packager`, prompt:
-```
-Mode: assemble. Run folder: W. Run: <k>. Date: <date>. Debate verdict: <verdict>.
-Decision log summary: <output of --summary>.
-Read W/business-case.md, W/prd-draft.md, D/decision-log.md, W/user-stories.md, W/definition-of-done.md, W/story-map.md, COV.
-Write W/final-prd.md.
-```
+## Stage 7 · Last questions, then the grooming package
+Nothing the PO could answer should reach the package unasked. Label for this step: `run<k>-final`.
+1. `dl.py open --final` lists every row still open, including the ones parked earlier (minor closing-round findings,
+   question cap, coverage GAPs, `[Stories]` and `[DoD]` rows). Only ids the PO chose to leave for grooming are skipped.
+   If it lists nothing, go to step 4.
+2. For ids that need a question block, spawn a fresh Agent `designer`:
+   ```
+   Mode: options. Run folder: W.
+   Read W/prd-draft.md, context/product-context.md, D/confirmed-facts.md, D/decision-log.md, W/user-stories.md.
+   Prepare PO questions for: <ids>.
+   Write W/rounds/rP-designer-options.md.
+   ```
+   then `dl.py options W/rounds/rP-designer-options.md run<k>-final`.
+3. Run the **PO checkpoint** with `dl.py ask <ids…> --final` (not capped), 4 at a time, until `dl.py open --final`
+   lists nothing; record "Leave for grooming" there with `dl.py defer <id> --final`. Instead of the checkpoint's step 4, if anything was decided:
+   - first a fresh Agent `designer`: the apply prompt with `Round: P`. It runs **before** the others because the
+     PRD is where wording is settled; the stories copy it (running them in parallel let the wording drift);
+   - then, in parallel, a fresh Agent `story-writer`:
+     ```
+     Mode: apply. Run folder: W. Read W/prd-draft.md, D/decision-log.md, context/product-context.md, D/confirmed-facts.md, W/user-stories.md.
+     Apply PO decisions for: <decided DL ids>.
+     Edit W/user-stories.md.
+     ```
+     and, if any `decide` line said `affects: DoD`, a fresh Agent `packager`:
+     ```
+     Mode: dod-apply. Run folder: W.
+     Read D/decision-log.md, D/confirmed-facts.md, W/user-stories.md, W/definition-of-done.md.
+     Apply PO decisions for: <the decided ids whose decide line said affects: DoD>.
+     Edit W/definition-of-done.md.
+     ```
+   Summary line: `✔ Last questions — decided: <ids> · left for grooming: <ids>`.
+4. `dl.py package-parts`: writes `W/readiness.md` (Definition of Ready per story, checked by script),
+   `W/po-decisions.md` (question → answer for every PO decision) and `W/slices.md`. Put its first line in the summary.
+   Then Agent `packager`, prompt:
+   ```
+   Mode: summary. Run folder: W.
+   Read W/business-case.md, W/prd-draft.md, D/decision-log.md, W/user-stories.md, W/readiness.md.
+   Write W/package-summary.md.
+   ```
+   Then `dl.py assemble COV`: builds `W/final-prd.md` from the summary and the checked files (terms, stories,
+   readiness, DoD, slices, PO decisions, open and tech questions are copied, never retyped). Put its line in the summary.
+5. `python3 scripts/validate_output.py package W` (formats, budgets, altitude words, unlogged 🔵, and consistency
+   between stories, story map, decision log and PRD §8). Put the number of problems in the summary and list up to 5.
+Do not fix them yourself; they are for the PO and the retro.
 
-## Stage 8 · Retro (suggestions only)
-1. Run `python3 scripts/run_metrics.py W` (it writes `W/run-metrics.md`).
-2. Agent `retro`, prompt:
+## Stage 8 · Retro (suggestions only; runs in the background)
+The package is done before the retro starts, so the PO gets it without waiting for the retro.
+1. `python3 scripts/run_metrics.py W` (writes `W/run-metrics.md`).
+2. Agent `retro` with `run_in_background: true`, then **immediately** print the Final message (below). Prompt:
    ```
    Run folder: W. Read W/run-metrics.md first, then the files in W and W/rounds, D/decision-log.md,
-   D/confirmed-facts.md, CLAUDE.md, .claude/commands/groom.md, .claude/agents/*.md<, P/retro.md if it exists>.
+   D/confirmed-facts.md, CLAUDE.md, CHANGELOG.md, .claude/commands/groom.md, .claude/agents/*.md<, P/retro.md if it exists><,
+   groomed/scorecard.csv if it exists>.
    Write W/retro.md.
    ```
 3. Do **not** act on the retro: change no agent, rule, artifact or log row because of it, and never pass `retro.md`
    or `run-metrics.md` to another agent. They are for the PO.
-4. If this stage fails, say so in the summary. The package is still complete.
-Mark the run complete in run-state.json.
+4. When the retro finishes: the output check (`--after retro retro.md`), then `dl.py scores` (stores the retro's
+   scorecard in `groomed/scorecard.csv` and prints this run's scores with the trend), then `dl.py state complete`
+   (marks the run complete and removes the active-run pin). Print ≤ 3 lines: the scores line, the path to
+   `W/retro.md` and its top recommendation (the retro agent's reply, one line).
+5. If this stage fails, say so. The package is still complete; still run `dl.py state complete`.
 
-## Final message
-≤ 9 lines: the path to `W/final-prd.md` and its line count (`wc -l`), the verdict, the log summary, open or BLOCKING
-ids the PO must answer at grooming, how many questions went to the tech team, the path to `W/retro.md` with its
-top suggestion (the retro agent's reply, one line), and one line listing the stage files.
-Do not paste the package.
+## Final message (printed right after the retro starts)
+≤ 8 lines: the path to `W/final-prd.md` and its line count, the verdict, the log summary, open or BLOCKING ids (with
+names) the PO must answer at grooming, how many questions went to the tech team, the package-lint problem count,
+one line listing the stage files, and "Retro running; its scores follow." Open ids are only those the PO chose to
+leave for grooming. Do not paste the package.

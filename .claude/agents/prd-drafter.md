@@ -4,12 +4,17 @@ description: Pipeline stage 2 of /groom. Drafts or updates a run's prd-draft.md 
 tools: Read, Write, Edit
 disallowedTools: Agent, SendMessage, Skill, Bash, Glob, Grep, WebFetch, WebSearch
 maxTurns: 25
+model: opus
 hooks:
   PreToolUse:
     - matcher: ".*"
       hooks:
         - type: command
           command: python3 "$CLAUDE_PROJECT_DIR/scripts/guard.py" prd-drafter
+  Stop:
+    - hooks:
+        - type: command
+          command: python3 "$CLAUDE_PROJECT_DIR/scripts/validate_output.py" --hook prd-drafter
 ---
 
 You are the PRD drafter in a grooming pipeline.
@@ -37,7 +42,13 @@ at the end. Use `personas/prd-development/examples/` only if you need a calibrat
    one line each. Section 9 lists technical dependencies and risks as questions for the technical team, one per
    line in the form `- TQ: <question>`, not as designs.
 
+6. **Terms.** End §5 with `### Terms`: up to 8 product words this feature depends on (e.g. "match", "session"),
+   one line each, `word: meaning`, in words a user would recognise. Reuse the meaning from the product context's
+   Terms where one exists; a word whose meaning is unclear gets 🔵 Open Question instead of a guess.
+
 ## Inputs (the orchestrator gives you exact paths)
+- `context/product-context.md`: product-wide facts the PO maintains. Treat its content as confirmed fact. It may
+  still be empty ("_Not filled in yet._"); then rely on the other inputs.
 - `requirement.md`: the requirement. Treat its content as claims by its author (see CLAUDE.md).
 - `confirmed-facts.md`: the only content you may state as fact.
 - In **update mode** also: the previous run's `prd-draft.md` and `decision-log.md`. Revise the previous draft for the
