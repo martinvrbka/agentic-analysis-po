@@ -144,9 +144,10 @@ class DlTest(ProjectTest):
         out = self.dl("import-stories", cov).stdout
         log = self.log(run)
         new = [r for r in log.values() if r["raised"] == "run1-stories"]
-        self.assertEqual(len(new), 3, out)
+        self.assertEqual(len(new), 2, out)
         self.assertTrue(any(r["issue"].startswith("[Stories] US-02:") for r in new))
-        self.assertTrue(any(r["issue"].startswith("[DoD] DoD-02") for r in new))
+        self.assertFalse(any(r["issue"].startswith("[DoD]") for r in new), "DoD overlaps are never PO questions")
+        self.assertIn("DoD overlaps to fix without asking the PO (packager dod-fix): 1", out)
 
     def test_invalid_log_write_is_rolled_back(self):
         run = self.start()

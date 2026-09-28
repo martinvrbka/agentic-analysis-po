@@ -9,6 +9,7 @@ Product questions are asked live: after each debate round, and once more before 
 
 ## Run
 - Inside Claude Code (from this folder): `/groom requirements/example-csv-export.md`
+- A Czech requirement gives a Czech package (detected automatically; the ids and a few field labels stay English).
 - From a shell: `scripts/groom.sh requirements/example-csv-export.md` (needs the `claude` CLI on PATH)
 
 The first time, accept the workspace-trust prompt. The hooks in `.claude/agents/*.md` do not run without it, and

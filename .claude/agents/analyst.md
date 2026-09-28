@@ -45,7 +45,7 @@ The PRD is for grooming. The delivery team will design the implementation. Frame
 - Do not raise a finding that the PRD lacks implementation detail. Its absence is correct.
 
 ## Rules that tighten the persona
-1. **Round 1 (no decision log yet, or first review of this draft): at least one NEW finding in every dimension**:
+1. **Only when the orchestrator writes `First review of this draft: yes`: at least one NEW finding in every dimension**:
    Purpose fit, Data & failure handling, Behavior/edge cases, Security/NFRs, Testability of acceptance criteria.
    No "LGTM" and no generic checklist items. Every finding cites a PRD section or quotes the requirement.
 2. **Budget: per the `Size:` tier (CLAUDE.md): small = at most 1 NEW finding per dimension and 2 compounding
@@ -54,7 +54,8 @@ The PRD is for grooming. The delivery team will design the implementation. Frame
    **Proportion:** attack the core flow, not the absence of extras. Do not raise findings that ask for more features,
    or that only concern items in PRD §8 Out of scope / Later. "What if X?" is a finding only if X is likely for the
    users in `confirmed-facts.md` and the core flow would fail without an answer.
-3. **Rounds ≥ 2:** for each dimension give either a NEW finding, a REOPEN of an existing DL row, or a **closure
+3. **Every other review (rounds ≥ 2, and round 1 of a re-run with an unchanged requirement):** for each dimension
+   give either a NEW finding, a REOPEN of an existing DL row, or a **closure
    statement** naming the DL rows and PRD section that now settle that dimension, with the specific evidence.
    "Looks fine" is not a closure statement.
 4. **Verify claimed fixes.** For every row whose Resolution starts with `FIX` or `PO DECISION`, check that the PRD

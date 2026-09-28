@@ -20,15 +20,16 @@ the log after every Bash call. Every other artifact is written by a subagent, ex
 
 ## Isolation rules for you (the main way isolation could break is through you)
 - Spawn every worker with the **Agent** tool using its `subagent_type` and the **exact prompt template** given below.
-  Fill in only paths, round numbers, modes and the size tier. **Every** agent prompt starts with the line
-  `Size: <tier>.`. **Never** add summaries, quotes, opinions or hints drawn from another agent's output, and never
+  Fill in only paths, round numbers, modes, the size tier and the language. **Every** agent prompt starts with the
+  line `Size: <tier>. Language: <Czech | English>.` (the `language:` line of `dl.py start`). **Never** add summaries, quotes, opinions or hints drawn from another agent's output, and never
   tell an agent what a previous round "was worried about". Paths only.
 - A **new** Agent call for every designer and analyst turn. Never resume or message a previous instance, except
   for the output check below.
 - If a worker reports a guard block, do not work around it; report it to the user.
 
 ## Output check (after every agent, including parallel ones)
-Some clients do not run the Stop hook in the agent files, so you run the same check yourself:
+Some clients do not run the Stop hook in the agent files, so you run the same check yourself (with the
+SubagentStop hook in `.claude/settings.json`, agents usually fix their output before you see it, and this is `OK`):
 1. `python3 scripts/validate_output.py --after <role> <files it wrote, relative to W>` (e.g. `--after analyst
    rounds/r2-analyst.md`, `--after packager business-case.md`). `OK` → go on.
 2. Otherwise send the printed problems, and nothing else, to **the same agent** with SendMessage (load it once with
@@ -52,13 +53,14 @@ The product owner answers open product questions live, so stories are built on d
    AskUserQuestion JSON built from the designer's question blocks (recommended option first, `Leave for grooming`
    last) and enforces the per-run question cap. Ids it lists under `over_cap_defer`: run
    `dl.py defer <id> --cap` and do not ask them. If it says `cap_reached`, defer all of them the same way.
+   The option texts come in the requirement's language (`(Doporučeno)`, `Nechat na grooming` for Czech).
 2. Ask the returned questions in **one** AskUserQuestion call, exactly as returned, without the `dl_id` key (it tells
    you which DL id each question belongs to; the header is a short topic, not the id).
 3. For each answer:
    - an option or the user's own text: `dl.py decide <id> <label> "<answer as shown or typed, word for word>"`
      (label = `run<k>-R<N>` or `run<k>-RF`). For a multi-select answer, join the chosen options with ` AND `.
      `decide` stores the chosen option together with its consequence line, so exact wording the PO saw is kept.
-   - `Leave for grooming`: `dl.py defer <id>`. Never ask about that id again in this run.
+   - `Leave for grooming` / `Nechat na grooming`: `dl.py defer <id>`. Never ask about that id again in this run.
    - **Other text that points to another source** (a file, folder or earlier feature): read that source yourself,
      pick at most 3 claims from it that answer this DL question, quoted as written, and ask the PO to confirm them in
      the **next** AskUserQuestion call (`multiSelect: true`, one option per claim, plus `None of these`). Record only
@@ -83,11 +85,13 @@ The product owner answers open product questions live, so stories are built on d
 3. `python3 scripts/dl.py start <requirement> <slug>`. If it prints `INCOMPLETE <folder>`, ask the user whether to
    resume that run or start a new one, and rerun with `--resume` or `--new`.
    On a re-run (P is set), show the user a ≤ 5-line gist of `diff P/requirement.md W/requirement.md`.
-4. Put `tier`, max rounds (`MAX`), the `personas:` and `product context:` lines from `start` in the summary. If personas say CHANGED,
+4. Put `tier`, max rounds (`MAX`), the `language:`, `requirement:`, `personas:` and `product context:` lines from
+   `start` in the summary. If personas say CHANGED,
    tell the user the persona snapshots differ from `personas/SOURCES.sha256` and ask whether to continue.
 
 ## Stage 1 · Clarify and business context (you, interactively)
 Ask **at most 8** questions in total with AskUserQuestion (≤ 4 per call), product and business only, never technical.
+Write the questions, options and your stage summaries in the requirement's language (`language:` from `start`).
 Skip any question `D/confirmed-facts.md` already answers; on a re-run, ask only about what changed.
 1. **Product (call 1):** scan `W/requirement.md`, `context/product-context.md` and `D/confirmed-facts.md` against
    these 10 product-level areas and mark each Clear / Partial / Missing: scope and goal · users and roles · user flow
@@ -126,7 +130,9 @@ Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
 **Each round N = 1..MAX:**
 1. Agent `analyst`, prompt:
    ```
-   Mode: review. Round: <N>. Run folder: W. <First review of this draft: yes — if N = 1>
+   Mode: review. Round: <N>. Run folder: W. <First review of this draft: yes — only if N = 1 and `start` said
+   `requirement: new feature` or `CHANGED`. On a re-run of an unchanged requirement leave it out: the analyst then
+   may close settled areas instead of having to find something new in each one>
    Read W/requirement.md, context/product-context.md, D/confirmed-facts.md, W/prd-draft.md, D/decision-log.md.
    Write W/rounds/r<N>-analyst.md.
    ```
@@ -218,8 +224,9 @@ Write W/business-case.md.
    ```
    (`COV = W/coverage-report.md`). No further revision after this second check.
 4. `dl.py gaps COV`: every GAP row is reopened as COVERAGE GAP, even if it was Resolved.
-5. `dl.py import-stories COV`: every 🔵 line in the stories and every leftover vague or DoD-separation item becomes a
-   Still Open row, so nothing open stays outside the log.
+5. `dl.py import-stories COV`: every 🔵 line in the stories and every leftover vague item becomes a Still Open row,
+   so nothing open stays outside the log. DoD / AC overlaps are housekeeping, never PO questions: if it counts any,
+   spawn a fresh Agent `packager` with the `dod-fix` prompt from step 3, reading COV instead of coverage-report-1.md.
 6. Summary: gaps / vague counts of the first check → of the final check, implementation-detail / separation counts,
    the `--check user-stories.md` line and `dl.py summary`.
 

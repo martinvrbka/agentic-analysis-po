@@ -162,7 +162,7 @@ def main():
             current = h.group(1)
         elif re.match(r"^#{1,2}\s", l):
             current = None
-        if current and "Scenario" in l and re.search(r"Scenario( Outline)?:", l):
+        if current and re.search(r"(Scenario( Outline)?|Scénář|Náčrt scénáře):", l):
             per_story[current] += 1
     stories = sorted({re.match(r"^#{2,4}\s*(US-\d+)", l).group(1) for l in us if re.match(r"^#{2,4}\s*US-\d+", l)})
     out += ["## Stories", f"- Stories: {len(stories)} · {flag(len(stories), *STORIES)}",

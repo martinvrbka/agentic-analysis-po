@@ -85,7 +85,7 @@ class AssembleTest(ProjectTest):
     def test_package_is_built_from_the_checked_files(self):
         run, W = self.build()
         out = self.dl("assemble", f"{W}/coverage-report.md").stdout
-        self.assertRegex(out, r"final-prd.md: \d+ lines · budget \(small\): ≤ 220 · ok")
+        self.assertRegex(out, r"final-prd.md: \d+ lines · budget \(small\): ≤ 180 · ok")
         pkg = readf(self.path(W, "final-prd.md"))
         self.assertEqual(vo.check_final(pkg.splitlines(), "small"), [])
         self.assertTrue(pkg.startswith("# Order export — Grooming package\nRun 1 · "))
@@ -98,6 +98,26 @@ class AssembleTest(ProjectTest):
         self.assertIn("- **DL-003 export-speed-undefined** — ", pkg, "open rows are listed with their names")
         self.assertIn("## 10. Questions for the technical team\n- **DL-00", pkg)
         self.assertIn("How do we keep large exports from slowing the site?", pkg)
+
+    def test_czech_package_uses_czech_headings(self):
+        run = self.start()
+        pin = self.path("groomed", ".active-run.json")
+        data = json.loads(readf(pin))
+        data["lang"] = "cs"
+        self.write("groomed/.active-run.json", json.dumps(data))
+        W = run["run"]
+        self.fixture("prd-draft.md", f"{W}/prd-draft.md")
+        self.fixture("user-stories.md", f"{W}/user-stories.md")
+        self.fixture("coverage-report.md", f"{W}/coverage-report.md")
+        self.write(f"{W}/definition-of-done.md", DOD)
+        self.write(f"{W}/package-summary.md", SUMMARY)
+        self.dl("package-parts")
+        self.dl("assemble", f"{W}/coverage-report.md")
+        pkg = readf(self.path(W, "final-prd.md"))
+        for heading in ("# Order export — Podklady pro grooming", "## 3. Pojmy", "## 8. Rozhodnutí PO",
+                        "## 10. Otázky pro technický tým", "Stav: všechny produktové otázky rozhodnuty"):
+            self.assertIn(heading, pkg)
+        self.assertEqual(vo.check_final(pkg.splitlines(), "small"), [])
 
     def test_missing_summary_section_is_an_error(self):
         run, W = self.build()
@@ -170,6 +190,60 @@ class MetricsTest(ProjectTest):
         subprocess.run([sys.executable, os.path.join(SCRIPTS, "run_metrics.py"), self.path(W)], check=True,
                        capture_output=True, env=dict(os.environ, CLAUDE_PROJECT_DIR=self.root))
         self.assertIn("- Definition of Done items: 5 · ok", readf(self.path(W, "run-metrics.md")))
+
+
+class AutoHookTest(ProjectTest):
+    def test_auto_hook_takes_the_role_from_the_payload(self):
+        run = self.start()
+        bad = [l.replace("NEW_ISSUES: 3", "NEW_ISSUES: 9") for l in
+               readf(os.path.join(os.path.dirname(__file__), "fixtures", "r1-analyst.md")).splitlines()]
+        self.write(f"{run['run']}/rounds/r1-analyst.md", "\n".join(bad))
+        blocked = self.run_script("validate_output.py", "--hook", "--auto",
+                                  stdin=json.dumps({"agent_id": "a1", "agent_type": "analyst"}))
+        self.assertEqual(blocked.returncode, 2)
+        self.assertIn("NEW_ISSUES says 9", blocked.stderr)
+        other = self.run_script("validate_output.py", "--hook", "--auto", stdin=json.dumps({"agent_id": "a2"}))
+        self.assertEqual(other.returncode, 0, "agents outside the pipeline are not checked")
+
+
+CZ_REQ = "# Pokročilé filtry\nPřidat rozšířené filtrování receptů podle obtížnosti, času a kuchyně.\n"
+
+
+class LanguageAndRerunTest(ProjectTest):
+    def test_czech_requirement_is_detected_and_used_in_questions(self):
+        self.write("requirements/cz.md", CZ_REQ)
+        out = self.dl("start", "requirements/cz.md", "filtry").stdout
+        self.assertIn("language: cs (Czech)", out)
+        self.assertIn("requirement: new feature", out)
+        run = json.loads(readf(self.path("groomed", ".active-run.json")))
+        self.assertEqual(run["lang"], "cs")
+        W = run["run"]
+        self.dl("findings", self.fixture("r1-analyst.md", f"{W}/rounds/r1-analyst.md"), "run1-R1")
+        self.fixture("r1-designer-response.md", f"{W}/rounds/r1-designer-response.md")
+        q = json.loads(self.dl("ask", "DL-001").stdout)["questions"][0]
+        self.assertEqual(q["options"][0]["label"], "Admins and finance (Doporučeno)")
+        self.assertEqual(q["options"][-1]["label"], "Nechat na grooming")
+        self.dl("dispositions", f"{W}/rounds/r1-designer-response.md", "run1-R1", "DL-001,DL-002")
+        self.assertIn("Admins and finance — finance self-serves",
+                      self.dl("decide", "DL-001", "run1-R1", "Admins and finance (Doporučeno)").stdout and
+                      self.log(run)["DL-001"]["resolution"])
+
+    def test_english_stays_english_and_lang_can_be_forced(self):
+        self.assertIn("language: en (English)", self.dl("start", "requirements/req.md", "a").stdout)
+        self.dl("state", "complete")
+        self.write("requirements/cz.md", CZ_REQ)
+        self.assertIn("language: en (English)", self.dl("start", "requirements/cz.md", "b", "--lang", "en").stdout)
+
+    def test_rerun_says_whether_the_requirement_changed(self):
+        self.start()
+        self.dl("state", "complete")
+        self.assertIn("requirement: unchanged since the previous run", self.dl("start", "requirements/req.md",
+                                                                             "order-export").stdout)
+        self.dl("state", "complete")
+        self.write("requirements/req.md", "# Order export\nAdmins export orders as CSV and PDF.\n")
+        self.assertIn("requirement: CHANGED since the previous run", self.dl("start", "requirements/req.md",
+                                                                           "order-export").stdout)
+        self.assertTrue(json.loads(readf(self.path("groomed", ".active-run.json")))["requirement_changed"])
 
 
 if __name__ == "__main__":

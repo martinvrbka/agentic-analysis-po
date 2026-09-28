@@ -28,10 +28,10 @@ them from `scripts/budgets.json`; `tests/test_project_config.py` fails if this t
 | | small | standard |
 |---|---|---|
 | `prd-draft.md` | ≤ 120 lines | ≤ 250 lines |
-| Stories | 3–6, each 2–4 scenarios, `user-stories.md` ≤ 120 lines | 5–10, each 2–5 scenarios, ≤ 220 lines |
+| Stories | 3–6, each 2–4 scenarios, `user-stories.md` ≤ 90 lines | 5–10, each 2–5 scenarios, ≤ 220 lines |
 | `story-map.md` / `business-case.md` | none (a `Slice:` line per story) / ≤ 15 lines | ≤ 40 / ≤ 30 lines |
 | Definition of Done | 5–10 items | 8–15 items |
-| `final-prd.md` | ≤ 220 lines | ≤ 430 lines |
+| `final-prd.md` | ≤ 180 lines | ≤ 430 lines |
 | Debate rounds | max 2 | max 3 |
 | Analyst NEW findings per round | ≤ 1 per dimension, ≤ 2 compounding | ≤ 2 per dimension, ≤ 3 compounding |
 
@@ -99,5 +99,11 @@ problems, fix exactly those and finish again. You get one retry; after that the 
   enforces this after every write, including writes made through Bash.
 
 ## Language
-Write artifacts in the language of the requirement (Czech or English). Keep IDs, statuses and verdicts in English so
-scripts can parse them.
+Every prompt says `Language: Czech` or `Language: English` (detected by `dl.py start` from the requirement). Write
+all content in that language: PRD, stories, questions and options for the PO, business case, DoD, package summary,
+retro, row names. A Czech requirement gives a Czech package.
+Keep in English, so the scripts can parse them: ids (`DL-007`, `US-01`, `DoD-01`), statuses, verdicts, dispositions,
+severities, the section headings your agent's output format lists (`## Findings`, `## 0.` …, `### Terms`), field
+labels (`Question:`, `Header:`, `Recommended:`, `Combinable:`, `Covers:`, `INVEST:`, `Slice:`, `Blocked by:`,
+`TQ:`), the Gherkin keywords `Scenario / Given / When / Then / And`, and the scorecard metric names. The heading
+text after `## 0.` may be Czech. A Czech story reads `Jako … chci … abych …`.

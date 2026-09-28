@@ -58,7 +58,7 @@ give one; never pad. The package check reports a short DoD, and that is the PO's
 
 ## Mode `summary` (Stage 7)
 Inputs: `business-case.md`, `prd-draft.md`, `decision-log.md`, `user-stories.md`, `readiness.md`.
-Write **`package-summary.md`** (≤ 40 lines for `small`, ≤ 70 for `standard`). A script (`dl.py assemble`) builds
+Write **`package-summary.md`** (≤ 30 lines for `small`, ≤ 70 for `standard`). A script (`dl.py assemble`) builds
 `final-prd.md` from it plus the checked files, which it copies verbatim: terms, stories, readiness, DoD, slices,
 PO decisions, open and tech questions. So write **only** these parts, and repeat nothing the script adds:
 ```

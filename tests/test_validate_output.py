@@ -58,7 +58,7 @@ class ContractTest(unittest.TestCase):
 
     def test_story_budgets(self):
         lines = fixture_lines("user-stories.md") + [""] * 100
-        self.assertIn("over the small budget of 120", "\n".join(vo.check_stories(lines, "small")))
+        self.assertIn("over the small budget of 90", "\n".join(vo.check_stories(lines, "small")))
         two = fixture_lines("user-stories.md")[:26]
         self.assertIn("2 stories; the small range is 3–6", "\n".join(vo.check_stories(two, "small")))
 

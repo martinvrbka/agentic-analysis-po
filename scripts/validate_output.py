@@ -7,6 +7,8 @@ Usage:
                                         hook does not fire in every client). Exit 1 lists the problems for one fix
                                         round; --record writes what is still wrong to validation-warnings.log.
   validate_output.py --hook <role>      SubagentStop hook (wired as a `Stop` hook in each agent's frontmatter).
+  validate_output.py --hook --auto      The same as a project-level SubagentStop hook in .claude/settings.json: the
+                                        role comes from the payload's `agent_type`; other agents are not checked.
                                         Checks the file(s) that role just wrote in the active run. On failure it
                                         blocks the stop (exit 2) so the agent fixes its own output, at most
                                         `max_output_retries` times (budgets.json); after that it lets the agent stop
@@ -37,7 +39,7 @@ LONG_SENTENCE = 30  # words; prose written for the package reader is split above
 STOP = set("with from that this your their into over when what have been will must should than then only also "
            "each every more less other same them they which while about".split())
 ALTITUDE = re.compile(r"\b(endpoints?|API|HTTP|JSON|database|SQL|replicas?|microservices?|webhooks?|"
-                      r"status codes?|backend|frontend)\b", re.I)
+                      r"status codes?|backend|frontend|databáz\w*|stavov\w* kód\w*)\b", re.I)
 
 
 def bullets(lines):
@@ -202,7 +204,7 @@ def check_stories(lines, tier, name="user-stories.md"):
             cur = None
         elif cur:
             s = stories[cur]
-            s["scen"] += bool(re.search(r"Scenario( Outline)?:", l))
+            s["scen"] += bool(re.search(r"(Scenario( Outline)?|Scénář|Náčrt scénáře):", l))  # Czech Gherkin too
             s["invest"] |= "INVEST:" in l
             s["covers"] |= "Covers:" in l
             s["slice"] |= bool(re.match(r"^\s*Slice:\s*\S", l))
@@ -453,8 +455,15 @@ def tier_for(W):
     return "small" if words <= budgets()["small_max_words"] else "standard"
 
 
+ROLES = ("analyst", "designer", "prd-drafter", "story-writer", "coverage-checker", "packager", "retro")
+
+
 def hook(role):
     payload = json.load(sys.stdin)
+    if role == "--auto":
+        role = payload.get("agent_type") or ""
+        if role not in ROLES:
+            sys.exit(0)
     root = project_root(payload)
     run = active_run(root)
     if not run:

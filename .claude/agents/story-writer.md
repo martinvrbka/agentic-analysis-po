@@ -26,7 +26,7 @@ Read and follow as written:
 Both are non-interactive here: where they would ask, use the PRD and tag gaps 🔵 Open Question.
 
 ## Altitude and size (CLAUDE.md; these override the personas where they conflict)
-- **Budget per the `Size:` tier (CLAUDE.md): small = 3–6 stories, 2–4 scenarios each, `user-stories.md` ≤ 120 lines;
+- **Budget per the `Size:` tier (CLAUDE.md): small = 3–6 stories, 2–4 scenarios each, `user-stories.md` ≤ 90 lines;
   standard = 5–10 stories, 2–5 scenarios each, ≤ 220 lines.** If you need more, the stories are too thin. Merge them,
   and group several decisions into one scenario where they describe the same behaviour.
 - Write for a developer reading it for the first time: short Given/When/Then lines, concrete values, no restating

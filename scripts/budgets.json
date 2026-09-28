@@ -8,12 +8,12 @@
     "small": {
       "lines": {
         "prd-draft.md": 120,
-        "final-prd.md": 220,
+        "final-prd.md": 180,
         "business-case.md": 15,
-        "user-stories.md": 120,
+        "user-stories.md": 90,
         "story-map.md": null,
         "retro.md": 80,
-        "package-summary.md": 40
+        "package-summary.md": 30
       },
       "stories": [
         3,

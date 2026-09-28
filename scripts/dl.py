@@ -5,7 +5,9 @@ The orchestrator transcribes agent output through these commands instead of edit
 decision-log write is validated by check_decision_log.check() and rolled back if it is invalid.
 All commands act on the active run pinned by `start` (groomed/.active-run.json).
 
-  start <requirement.md> <slug> [--resume|--new]   create or resume a run, pin it, print k / W / P / tier
+  start <requirement.md> <slug> [--resume|--new] [--lang cs|en]
+                                                   create or resume a run, pin it, print k / W / P / tier / language
+                                                   and whether the requirement changed since the previous run
   state stage=<n> | rounds=<n> | verdict=<text> | complete
   fact "<text>"                                    append a user-confirmed fact
   findings <analyst.md> <label> [--closing]        log NEW / REOPEN findings and compounding risks
@@ -13,7 +15,8 @@ All commands act on the active run pinned by `start` (groomed/.active-run.json).
   options <designer-options.md> <label>            ids the designer marked TECH-QUESTION -> Tech team
   import-prd                                       §9 `- TQ:` lines and open PO rows of §10 -> log rows
   gaps <coverage-report.md>                        GAP rows -> Still Open, COVERAGE GAP
-  import-stories <coverage-report.md>              🔵 lines in stories, leftover vague / DoD items -> log rows
+  import-stories <coverage-report.md>              🔵 lines in stories, leftover vague items -> log rows; counts
+                                                   DoD overlaps (fixed by the packager, never asked)
   open [--final]                                   ids the PO checkpoint must still ask, and which lack a question
                                                    (--final: also rows parked by the pipeline; for the last checkpoint)
   ask <DL-id> ... [--final]                        AskUserQuestion JSON for up to 4 ids, within the question cap
@@ -215,6 +218,74 @@ def context_status():
     return f"{len(facts)} facts" if facts else "empty (the PO can fill it in any time)"
 
 
+CZECH = set("ěščřžýáíéůúťďňĚŠČŘŽÝÁÍÉŮÚŤĎŇ")
+LANGS = {"cs": "Czech", "en": "English"}
+
+
+# Text the scripts themselves put in front of the PO or into the package, per requirement language (CLAUDE.md
+# "Language"). Ids, statuses and field labels the scripts parse stay English in every language.
+TEXT = {
+    "en": {"recommended": "(Recommended)", "leave": "Leave for grooming",
+           "leave_desc": "Keep it open and discuss it with the team",
+           "package": "Grooming package", "run": "Run", "status": "Status", "debate": "Debate",
+           "after_rounds": "after {n} round{s}", "log": "Decision log",
+           "all_decided": "every product question decided", "n_open": "{n} product question(s) left for grooming",
+           "s3": "Terms", "s4": "User stories & acceptance criteria", "s5": "Definition of Ready",
+           "s6": "Definition of Done", "s7": "Proposed slices", "s8": "PO decisions",
+           "s9": "Open product questions for grooming", "s10": "Questions for the technical team",
+           "s11": "Working files", "no_terms": "_No terms defined in the PRD._",
+           "none_open": "_None: every product question was decided before this package was written._",
+           "none": "_None._", "decision_log": "decision log", "rounds": "debate rounds",
+           "gaps_since": "gaps decided by the PO since",
+           "all_ready": "Each has value, testable criteria, nothing open, named dependencies and is small "
+                        "(checked by script, see readiness.md).",
+           "dor_intro": "_Checked by script from the stories, the coverage report and the decision log. ✓ = met._",
+           "crit": ("Value", "Testable", "Nothing open", "Dependencies named", "Small"), "ready_col": "Ready",
+           "ready": "**Ready**", "not_yet": "Not yet", "ready_line": "Ready: {r} of {n} stories.",
+           "not_yet_line": " Not yet: {x}.", "dec_title": "PO decisions",
+           "dec_intro": "_Questions the PO answered during this feature's grooming runs._",
+           "dec_head": "| DL | Topic | Question | Decision |", "dec_none": "| — | — | No PO decisions yet. | — |",
+           "slices": "Slices", "slices_intro": "_Proposal for discussion at grooming, not a commitment._"},
+    "cs": {"recommended": "(Doporučeno)", "leave": "Nechat na grooming",
+           "leave_desc": "Nechat otevřené a probrat s týmem",
+           "package": "Podklady pro grooming", "run": "Běh", "status": "Stav", "debate": "Debata",
+           "after_rounds": "počet kol: {n}{s}", "log": "Log rozhodnutí",
+           "all_decided": "všechny produktové otázky rozhodnuty", "n_open": "otevřené produktové otázky na grooming: {n}",
+           "s3": "Pojmy", "s4": "User stories a akceptační kritéria", "s5": "Definition of Ready",
+           "s6": "Definition of Done", "s7": "Navržené řezy (slices)", "s8": "Rozhodnutí PO",
+           "s9": "Otevřené produktové otázky na grooming", "s10": "Otázky pro technický tým",
+           "s11": "Pracovní soubory", "no_terms": "_PRD nedefinuje žádné pojmy._",
+           "none_open": "_Žádné: všechny produktové otázky byly rozhodnuty před sepsáním podkladů._",
+           "none": "_Žádné._", "decision_log": "log rozhodnutí", "rounds": "kola debaty",
+           "gaps_since": "mezery, které PO mezitím rozhodl",
+           "all_ready": "Každá má hodnotu, testovatelná kritéria, nic otevřeného, pojmenované závislosti a je malá "
+                        "(ověřeno skriptem, viz readiness.md).",
+           "dor_intro": "_Ověřeno skriptem ze stories, coverage reportu a logu rozhodnutí. ✓ = splněno._",
+           "crit": ("Hodnota", "Testovatelné", "Nic otevřeného", "Závislosti pojmenované", "Malé"),
+           "ready_col": "Připraveno", "ready": "**Připraveno**", "not_yet": "Zatím ne",
+           "ready_line": "Připraveno: {r} z {n} stories.", "not_yet_line": " Zatím ne: {x}.",
+           "dec_title": "Rozhodnutí PO", "dec_intro": "_Otázky, na které PO odpověděl během groomingu této feature._",
+           "dec_head": "| DL | Téma | Otázka | Rozhodnutí |", "dec_none": "| — | — | Zatím žádná rozhodnutí PO. | — |",
+           "slices": "Řezy (slices)", "slices_intro": "_Návrh k diskusi na groomingu, ne závazek._"},
+}
+
+
+def tx(run, key, **kw):
+    t = TEXT.get(run.get("lang") or "en", TEXT["en"])[key]
+    return t.format(**kw) if kw else t
+
+
+def detect_language(text):
+    """cs if the text has Czech diacritics (≥ 5, or ≥ 0.5 % of letters), else en."""
+    letters = sum(ch.isalpha() for ch in text) or 1
+    cz = sum(ch in CZECH for ch in text)
+    return "cs" if cz >= 5 or cz / letters >= 0.005 else "en"
+
+
+def requirement_body(path):
+    return "\n".join(l for l in (read_lines(path) or []) if not l.startswith("> Source:")).strip()
+
+
 def cmd_start(args):
     if len(args) < 2:
         die("usage: start <requirement.md> <slug> [--resume|--new]")
@@ -260,6 +331,11 @@ def cmd_start(args):
     words = sum(len(l.split()) for l in (read_lines(p(W, "requirement.md")) or []) if not l.startswith("> Source:"))
     B = budgets()
     tier = "small" if words <= B["small_max_words"] else "standard"
+    body = requirement_body(p(W, "requirement.md"))
+    lang = args[args.index("--lang") + 1] if "--lang" in args else detect_language(body)
+    if lang not in LANGS:
+        die(f"--lang must be one of {', '.join(LANGS)}")
+    changed = None if not P else body != requirement_body(p(P, "requirement.md"))
     if not resume:
         st["runs"].append({"run": k, "folder": W, "started": datetime.datetime.now().isoformat(timespec="seconds"),
                            "size": tier, "stages": {"0": "done"}, "rounds": 0, "verdict": None,
@@ -269,11 +345,14 @@ def cmd_start(args):
     with open(sf, "w", encoding="utf-8") as f:
         json.dump(st, f, ensure_ascii=False, indent=1)
     with open(p(ACTIVE_NAME), "w", encoding="utf-8") as f:
-        json.dump({"slug": slug, "feature": D, "run": W, "prev": P, "k": k, "tier": tier}, f, indent=1)
+        json.dump({"slug": slug, "feature": D, "run": W, "prev": P, "k": k, "tier": tier, "lang": lang,
+                   "requirement_changed": changed}, f, indent=1)
     cdl.check(p(D, "decision-log.md"))  # seed the snapshot
     print(f"{'resumed' if resume else 'started'} run {k}\nD={D}\nW={W}\nP={P or '-'}\n"
           f"tier={tier} ({words} words) · max rounds={B['tiers'][tier]['rounds']} · "
-          f"PO question cap={B['max_po_questions']}\npersonas: {persona_check()}\nproduct context: {context_status()}")
+          f"PO question cap={B['max_po_questions']}\nlanguage: {lang} ({LANGS[lang]})\n"
+          f"requirement: {'new feature' if changed is None else 'CHANGED since the previous run' if changed else 'unchanged since the previous run'}\n"
+          f"personas: {persona_check()}\nproduct context: {context_status()}")
 
 
 def cmd_state(args):
@@ -495,12 +574,12 @@ def cmd_import_stories(args):
         item = f"[Stories] {b}"
         if esc(item) not in text:
             added.append(add_row(rows, item, label, "Still Open"))
-    for b in bullets(section(cov, r"DoD / AC separation")):
-        item = f"[DoD] {b}"
-        if esc(item) not in text:
-            added.append(add_row(rows, item, label, "Still Open"))
+    # DoD / AC overlaps are housekeeping, not product questions: the orchestrator has the packager fix them
+    # (dod-fix) instead of asking the PO. Only a story's own open question or vague criterion becomes a row.
+    dod_notes = [b for b in bullets(section(cov, r"DoD / AC separation")) if not b.lower().startswith(("none", "žádn"))]
     save_rows(run, rows)
-    print(f"story / DoD rows: {', '.join(added) or 'none'}")
+    print(f"story rows: {names(rows, added)}")
+    print(f"DoD overlaps to fix without asking the PO (packager dod-fix): {len(dod_notes)}")
 
 
 def question_block(run, rid):
@@ -565,9 +644,9 @@ def cmd_ask(args):
         opts = b["options"]
         rec = [o for o in opts if o[0] == b["recommended"]]
         rest = [o for o in opts if o[0] != b["recommended"]][:2]
-        options = [{"label": f"{o[1]} (Recommended)", "description": o[2]} for o in rec] + \
+        options = [{"label": f"{o[1]} {tx(run, 'recommended')}", "description": o[2]} for o in rec] + \
                   [{"label": o[1], "description": o[2]} for o in rest] + \
-                  [{"label": "Leave for grooming", "description": "Keep it open and discuss it with the team"}]
+                  [{"label": tx(run, "leave"), "description": tx(run, "leave_desc")}]
         qs.append({"header": b["header"] or rid, "question": b["question"], "multiSelect": b["multi"],
                    "options": options, "dl_id": rid})
     print(json.dumps({"questions": qs, "over_cap_defer": over, "questions_left_after": left - len(ask)},
@@ -593,7 +672,7 @@ def cmd_decide(args):
     # Keep it with the answer so the agents that apply the decision copy that wording instead of inventing one.
     b = question_block(run, rid)
     chosen = [o for o in (b["options"] if b else []) for part in answer.split(" AND ")
-              if o[1].strip().lower() == re.sub(r"\s*\(Recommended\)\s*$", "", part).strip().lower()]
+              if o[1].strip().lower() == re.sub(r"\s*\((Recommended|Doporučeno)\)\s*$", "", part).strip().lower()]
     if chosen:
         answer = " AND ".join(f"{o[1]} — {o[2]}" for o in chosen)
     update(r, "Resolved", f"PO DECISION: {answer}", label)
@@ -644,7 +723,7 @@ def readiness_rows(stories, cov_lines, rows, tier):
     out = []
     for sid, _, body in stories:
         text = "\n".join(body)
-        scen = len(re.findall(r"Scenario( Outline)?:", text))
+        scen = len(re.findall(r"(?:Scenario(?: Outline)?|Scénář|Náčrt scénáře):", text))
         covers = re.findall(r"DL-\d{3,}", next((l for l in body if "Covers:" in l), ""))
         still = [i for i in covers if i in open_rows] + \
                 [r["id"] for r in open_rows.values() if r["issue"].startswith(f"[Stories] {sid}:")]
@@ -678,20 +757,19 @@ def cmd_package_parts(args):
     rows = rows_of(run)
     ready = readiness_rows(stories, cov, rows, run["tier"])
     crit = ("Value", "Testable", "Nothing open", "Dependencies named", "Small")
-    out = ["# Definition of Ready", "",
-           "_Checked by script from the stories, the coverage report and the decision log. ✓ = met._", "",
-           "| Story | " + " | ".join(crit) + " | Ready |", "|---|" + "---|" * (len(crit) + 1)]
+    out = ["# Definition of Ready", "", tx(run, "dor_intro"), "",
+           "| Story | " + " | ".join(tx(run, "crit")) + f" | {tx(run, 'ready_col')} |",
+           "|---|" + "---|" * (len(crit) + 1)]
     for sid, c, _ in ready:
         out.append(f"| {sid} | " + " | ".join("✓" if c[k] else "✗" for k in crit) + " | "
-                   + ("**Ready**" if all(c.values()) else "Not yet") + " |")
+                   + (tx(run, "ready") if all(c.values()) else tx(run, "not_yet")) + " |")
     not_ready = [f"{sid} ({'; '.join(n)})" for sid, c, n in ready if not all(c.values())]
-    out += ["", f"Ready: {len(ready) - len(not_ready)} of {len(ready)} stories."
-            + (f" Not yet: {', '.join(not_ready)}." if not_ready else "")]
+    out += ["", tx(run, "ready_line", r=len(ready) - len(not_ready), n=len(ready))
+            + (tx(run, "not_yet_line", x=", ".join(not_ready)) if not_ready else "")]
     with open(p(W, "readiness.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
 
-    dec = ["# PO decisions", "", "_Questions the PO answered during this feature's grooming runs._", "",
-           "| DL | Topic | Question | Decision |", "|---|---|---|---|"]
+    dec = [f"# {tx(run, 'dec_title')}", "", tx(run, "dec_intro"), "", tx(run, "dec_head"), "|---|---|---|---|"]
     n = 0
     for r in rows:
         if not r["resolution"].startswith("PO DECISION:"):
@@ -703,7 +781,7 @@ def cmd_package_parts(args):
         dec.append(f"| {r['id']} | {r['name'] or auto_name(r['issue'])} | {esc(q)} | {esc(answer)} |")
         n += 1
     if not n:
-        dec.append("| — | — | No PO decisions yet. | — |")
+        dec.append(tx(run, "dec_none"))
     with open(p(W, "po-decisions.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(dec) + "\n")
 
@@ -715,7 +793,7 @@ def cmd_package_parts(args):
             order.append(name)
             slices[name] = []
         slices[name].append(sid)
-    sl = ["# Slices", "", "_Proposal for discussion at grooming, not a commitment._", ""] + \
+    sl = [f"# {tx(run, 'slices')}", "", tx(run, "slices_intro"), ""] + \
          [f"- **{name}:** {', '.join(slices[name])}" for name in order]
     with open(p(W, "slices.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(sl) + "\n")
@@ -773,14 +851,14 @@ def cmd_assemble(args):
     rows = rows_of(run)
     r = current(load_state(run), run)
     title = next((l[2:].strip() for l in summary_lines if l.startswith("# ")), run["slug"])
-    title = title if "grooming package" in title.lower() else f"{title} — Grooming package"
+    title = title if tx(run, "package").lower() in title.lower() else f"{title} — {tx(run, 'package')}"
     still = [x for x in rows if x["status"].startswith("Still Open")]
     still.sort(key=lambda x: (x["status"] != "Still Open (BLOCKING)", x["id"]))
-    status = ("every product question decided" if not still
-              else f"{len(still)} product question{'s' if len(still) > 1 else ''} left for grooming")
+    status = tx(run, "all_decided") if not still else tx(run, "n_open", n=len(still))
     out = [f"# {title}",
-           f"Run {k} · {TODAY} · Status: {status} · Debate: {r.get('verdict') or '—'} after {r.get('rounds', 0)} "
-           f"round{'s' if r.get('rounds', 0) != 1 else ''} · Decision log: {cdl.summary(log_path(run))}", ""]
+           f"{tx(run, 'run')} {k} · {TODAY} · {tx(run, 'status')}: {status} · {tx(run, 'debate')}: "
+           f"{r.get('verdict') or '—'} {tx(run, 'after_rounds', n=r.get('rounds', 0), s='s' if r.get('rounds', 0) != 1 and run.get('lang') != 'cs' else '')} · "
+           f"{tx(run, 'log')}: {cdl.summary(log_path(run))}", ""]
     for n in ("0", "1", "2"):
         sec = section(summary_lines, rf"^{n}\.")
         head = next((l for l in summary_lines if re.match(rf"^## {n}\.", l)), None) or die(
@@ -789,30 +867,35 @@ def cmd_assemble(args):
             sec.pop()
         out += [head] + sec + [""]
     terms = subsection(need("prd-draft.md"), r"^Terms")
-    out += ["## 3. Terms"] + (terms or ["_No terms defined in the PRD._"]) + [""]
-    out += ["## 4. User stories & acceptance criteria"] + body_of(need("user-stories.md"), stop=r"Cross-cutting") + [""]
-    out += ["## 5. Definition of Ready"] + body_of(need("readiness.md")) + [""]
-    out += ["## 6. Definition of Done"] + body_of(need("definition-of-done.md")) + [""]
+    out += [f"## 3. {tx(run, 's3')}"] + (terms or [tx(run, "no_terms")]) + [""]
+    out += [f"## 4. {tx(run, 's4')}"] + body_of(need("user-stories.md"), stop=r"Cross-cutting|Průřezov") + [""]
+    ready_lines = body_of(need("readiness.md"))
+    table_rows = [l for l in ready_lines if re.match(r"^\|\s*US-\d+", l)]
+    if table_rows and all(l.rstrip().endswith(f"{tx(run, 'ready')} |") for l in table_rows):
+        # every story is ready: the table would only repeat ✓, so one line says it
+        ready_lines = [tx(run, "ready_line", r=len(table_rows), n=len(table_rows)) + " " + tx(run, "all_ready")]
+    out += [f"## 5. {tx(run, 's5')}"] + ready_lines + [""]
+    out += [f"## 6. {tx(run, 's6')}"] + body_of(need("definition-of-done.md")) + [""]
     story_map = read_lines(p(W, "story-map.md")) if run["tier"] == "standard" else None
-    out += ["## 7. Proposed slices"] + body_of(story_map or need("slices.md")) + [""]
-    out += ["## 8. PO decisions"] + body_of(need("po-decisions.md")) + [""]
-    out += ["## 9. Open product questions for grooming"]
+    out += [f"## 7. {tx(run, 's7')}"] + body_of(story_map or need("slices.md")) + [""]
+    out += [f"## 8. {tx(run, 's8')}"] + body_of(need("po-decisions.md")) + [""]
+    out += [f"## 9. {tx(run, 's9')}"]
     out += [f"- **{display(x)}**{' (BLOCKING)' if 'BLOCKING' in x['status'] else ''} — {issue_text(x)}"
-            for x in still] or ["_None: every product question was decided before this package was written._"]
+            for x in still] or [tx(run, "none_open")]
     tech = [x for x in rows if x["status"] == "Tech team"]
-    out += ["", "## 10. Questions for the technical team"]
+    out += ["", f"## 10. {tx(run, 's10')}"]
     for x in tech:
         q = re.sub(r"^TECH QUESTION:\s*", "", x["resolution"].split(" · prev:")[0]).replace("\\|", "|")
         out.append(f"- **{display(x)}** — {q if q and q != '—' else issue_text(x)}")
     if not tech:
-        out.append("_None._")
+        out.append(tx(run, "none"))
     cov = os.path.basename(args[0])
     gaps = coverage_gaps(read_lines(p(args[0]) if not os.path.isabs(args[0]) else args[0]) or [])
     since = [g for g in gaps if any(x["id"] == g and x["status"] == "Resolved" for x in rows)]
-    out += ["", "## 11. Working files",
-            "- [requirement.md](requirement.md) · [prd-draft.md](prd-draft.md) · [decision log](../decision-log.md) · "
-            "[debate rounds](rounds/)",
-            f"- [{cov}]({cov})" + (f" — gaps decided by the PO since: {', '.join(since)}" if since else "")]
+    out += ["", f"## 11. {tx(run, 's11')}",
+            f"- [requirement.md](requirement.md) · [prd-draft.md](prd-draft.md) · "
+            f"[{tx(run, 'decision_log')}](../decision-log.md) · [{tx(run, 'rounds')}](rounds/)",
+            f"- [{cov}]({cov})" + (f" — {tx(run, 'gaps_since')}: {', '.join(since)}" if since else "")]
     with open(p(W, "final-prd.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
     hi = budgets()["tiers"][run["tier"]]["lines"]["final-prd.md"]

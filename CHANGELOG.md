@@ -3,6 +3,23 @@
 One entry per change to the pipeline (rules, agents, scripts), with the reason. The retro agent reads this file to
 judge whether earlier changes helped. Newest first.
 
+## 2026-09-28 · Czech output, smaller small packages, fewer forced findings and PO questions
+- Language: `dl.py start` detects Czech (diacritics) or takes `--lang cs|en`; every prompt says
+  `Language: …`; all content is written in that language while ids, field labels, script-read headings and Gherkin
+  keywords stay English. Script-written text (question options, package headings, readiness, PO decisions, slices)
+  is translated. Reason: the PO's company requirements are in Czech.
+- Small tier: `final-prd.md` 220 → 180 lines, `user-stories.md` 120 → 90, `package-summary.md` 40 → 30. When every
+  story is ready, the package states it in one line instead of the ✓ table. Reason: an 88-word requirement gave a
+  220-line package. 160 was the PO's first target, but run 2's package measured ~183 lines even with 90-line
+  stories, because terms, DoD, PO decisions and questions are copied verbatim.
+- Re-runs: `dl.py start` says whether the requirement changed; "at least one NEW finding per dimension" applies only
+  to a new or changed requirement. Reason: run 2 (unchanged requirement) had to raise 7 new findings on a PRD
+  already debated, adding 17 log rows and 7 PO questions.
+- DoD / AC overlaps left after the coverage recheck are fixed by the packager (`dod-fix`), never asked as PO
+  questions. Reason: run 2's last three PO questions were DoD duplicates.
+- `validate_output.py --hook --auto` for a project-level SubagentStop hook (role from `agent_type`), so agents fix
+  their own output inside the same turn; the orchestrator's `--after` check stays as the fallback.
+
 ## 2026-09-28 · Fixes from the advanced-filters test runs (retros of run 1 and run 2, timing review)
 - Output check run by the orchestrator after every agent (`validate_output.py --after <role> <files>`, one fix round
   by message to the same agent, then `--record`). Reason: the Stop hooks in the agent files never ran in the VS Code
