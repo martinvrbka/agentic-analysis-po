@@ -105,7 +105,9 @@ remove the matching 🔵 Open Question tags. **Wording in double quotes in a dec
 character for character.** Do not polish it. The stories copy the PRD, and a script checks the three agree.
 Then **follow the decision through** (including the `### Terms` list in §5 if a word's meaning changed): search the whole PRD for every message, state, definition, metric or §10 row
 that the decision makes inconsistent (e.g. a line that counts "your filters" once both partners' filters apply, or a
-"runs out" definition that ignores a new exclusion rule) and update it too. Change nothing that the decision does
+"runs out" definition that ignores a new exclusion rule) and update it too. A §10 row the decision answers only in
+part is split now: the answered part is marked decided with its DL id, and only the still-open part stays open. Never
+leave an open §10 row whose question has already been answered; a later review would ask the PO about it again. Change nothing that the decision does
 not affect, and add no new state, screen or action. Write `rounds/r<N>-designer-apply.md` with a table
 `| DL id | PRD section | Follow-on edits |`, one row per id. Follow-on edits lists each other place you changed
 (section + a few words), or `none`. Where a decision changed user-facing text, quote the new text as it now stands

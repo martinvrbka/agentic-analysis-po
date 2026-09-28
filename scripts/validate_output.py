@@ -32,7 +32,8 @@ DIMENSIONS = ("Purpose", "Data", "Behavior", "Security", "Testability")
 SEVERITIES = ("blocking", "major", "minor")
 DISPOSITIONS = ("FIX", "ACCEPT-RISK", "OPEN-QUESTION", "TECH-QUESTION")
 COVERAGE_RESULTS = ("COVERED", "COVERED (DoD)", "GAP", "GAP (DoD-only)",
-                    "N/A — risk accepted without mitigation", "N/A — accepted by PO", "N/A — tech team")
+                    "N/A — risk accepted without mitigation", "N/A — accepted by PO", "N/A — tech team",
+                    "N/A — still open")
 # Words that signal technical design in product-level artifacts (CLAUDE.md "Altitude"). Warnings, not proof.
 NAME = re.compile(r"^[^\W_]+(-[^\W_]+){1,5}$")  # kebab-case, 2–6 words: the row name people read
 LONG_SENTENCE = 30  # words; prose written for the package reader is split above this
@@ -314,6 +315,16 @@ KIND_OF_FILE = {"prd-draft.md": "prd", "user-stories.md": "stories", "story-map.
                 "package-summary.md": "package-summary", "retro.md": "retro"}
 
 
+def kind_of_file(f):
+    """Which check a file named on the --after command line gets."""
+    name = os.path.basename(f)
+    if name in KIND_OF_FILE:
+        return KIND_OF_FILE[name]
+    if re.match(r"coverage-report(-\d+)?\.md$", name):
+        return "coverage"
+    return "analyst" if name.endswith("-analyst.md") else "designer"
+
+
 # ---------- which files a role produced ----------
 
 def newest(pattern):
@@ -368,9 +379,10 @@ def package_lint(W, tier):
     problems += consistency(W, tier)
     log_rows, _ = parse_log(os.path.join(os.path.dirname(W.rstrip("/")), "decision-log.md"))
     logged = " ".join(r["issue"] for r in log_rows)
-    for n, l in enumerate(read_lines(j("user-stories.md")) or [], 1):
-        if "🔵" in l and l.strip().lstrip("-* ").strip()[:60] not in logged:
-            problems.append(f"user-stories.md:{n}: 🔵 open question not in the decision log")
+    for name in ("user-stories.md", "final-prd.md"):
+        for n, l in enumerate(read_lines(j(name)) or [], 1):
+            if "🔵" in l and l.strip().lstrip("-* ").strip()[:60] not in logged:
+                problems.append(f"{name}:{n}: 🔵 open question not in the decision log")
     return problems
 
 
@@ -499,9 +511,7 @@ def after(role, files, record):
     root = project_root()
     run = active_run(root) or sys.exit("no active run")
     W = os.path.join(root, run["run"])
-    targets = [(KIND_OF_FILE[os.path.basename(f)] if os.path.basename(f) in KIND_OF_FILE else
-                "analyst" if f.endswith("-analyst.md") else "designer", os.path.join(W, f)) for f in files] \
-        if files else role_targets(role, W)
+    targets = [(kind_of_file(f), os.path.join(W, f)) for f in files] if files else role_targets(role, W)
     problems = run_checks(targets, run["tier"])
     if problems and record:
         with open(os.path.join(root, run["feature"], ".state", "validation-warnings.log"), "a", encoding="utf-8") as f:

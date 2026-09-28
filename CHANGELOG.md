@@ -3,6 +3,21 @@
 One entry per change to the pipeline (rules, agents, scripts), with the reason. The retro agent reads this file to
 judge whether earlier changes helped. Newest first.
 
+## 2026-09-28 · Fixes from the ux-simplification run 1 retro
+- Definition of Ready checks "Estimable" (INVEST `E ✓`); a story with `E ✗` is "Not yet", with its reason. Reason:
+  US-04 waited for the PO's list of today's functions, yet the package said "5 of 5 ready".
+- `dl.py import-prd` logs every 🔵 line in the PRD, not only open §10 rows, so it is asked in Stage 4 or 7. The
+  package lint also checks `final-prd.md` for unlogged 🔵. Reason: "profil: 🔵" in the Terms reached the package
+  while §9 said no questions were open.
+- `validate_output.py --after` checks `coverage-report-1.md` as a coverage report. Reason: it was checked as a
+  designer file and printed 16 false problems.
+- Coverage check: a Still Open row is `N/A — still open`. Reason: without that value the checker marked rows the PO
+  had not answered yet as "accepted by PO".
+- Stage 6: a DoD / AC overlap that asks to change a story scenario goes to the story-writer (`revise`), one about a
+  DoD item to the packager. Reason: the US-04 × DoD-02 overlap went to the packager twice, which may not edit stories.
+- Designer `apply`: a §10 row the PO answered in part is split at once. Reason: a half-decided row stayed open until
+  the closing review and cost an extra PO question (DL-011).
+
 ## 2026-09-28 · Czech output, smaller small packages, fewer forced findings and PO questions
 - Language: `dl.py start` detects Czech (diacritics) or takes `--lang cs|en`; every prompt says
   `Language: …`; all content is written in that language while ids, field labels, script-read headings and Gherkin

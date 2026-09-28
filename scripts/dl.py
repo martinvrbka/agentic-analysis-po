@@ -13,7 +13,7 @@ All commands act on the active run pinned by `start` (groomed/.active-run.json).
   findings <analyst.md> <label> [--closing]        log NEW / REOPEN findings and compounding risks
   dispositions <designer-response.md> <label> <ids>  log FIX / ACCEPT-RISK / OPEN-QUESTION / TECH-QUESTION
   options <designer-options.md> <label>            ids the designer marked TECH-QUESTION -> Tech team
-  import-prd                                       §9 `- TQ:` lines and open PO rows of §10 -> log rows
+  import-prd                                       §9 `- TQ:` lines, open PO rows of §10, other 🔵 lines -> log rows
   gaps <coverage-report.md>                        GAP rows -> Still Open, COVERAGE GAP
   import-stories <coverage-report.md>              🔵 lines in stories, leftover vague items -> log rows; counts
                                                    DoD overlaps (fixed by the packager, never asked)
@@ -237,10 +237,10 @@ TEXT = {
            "none_open": "_None: every product question was decided before this package was written._",
            "none": "_None._", "decision_log": "decision log", "rounds": "debate rounds",
            "gaps_since": "gaps decided by the PO since",
-           "all_ready": "Each has value, testable criteria, nothing open, named dependencies and is small "
+           "all_ready": "Each has value, testable criteria, nothing open, named dependencies, can be estimated and is small "
                         "(checked by script, see readiness.md).",
            "dor_intro": "_Checked by script from the stories, the coverage report and the decision log. ✓ = met._",
-           "crit": ("Value", "Testable", "Nothing open", "Dependencies named", "Small"), "ready_col": "Ready",
+           "crit": ("Value", "Testable", "Nothing open", "Dependencies named", "Estimable", "Small"), "ready_col": "Ready",
            "ready": "**Ready**", "not_yet": "Not yet", "ready_line": "Ready: {r} of {n} stories.",
            "not_yet_line": " Not yet: {x}.", "dec_title": "PO decisions",
            "dec_intro": "_Questions the PO answered during this feature's grooming runs._",
@@ -258,10 +258,10 @@ TEXT = {
            "none_open": "_Žádné: všechny produktové otázky byly rozhodnuty před sepsáním podkladů._",
            "none": "_Žádné._", "decision_log": "log rozhodnutí", "rounds": "kola debaty",
            "gaps_since": "mezery, které PO mezitím rozhodl",
-           "all_ready": "Každá má hodnotu, testovatelná kritéria, nic otevřeného, pojmenované závislosti a je malá "
+           "all_ready": "Každá má hodnotu, testovatelná kritéria, nic otevřeného, pojmenované závislosti, jde odhadnout a je malá "
                         "(ověřeno skriptem, viz readiness.md).",
            "dor_intro": "_Ověřeno skriptem ze stories, coverage reportu a logu rozhodnutí. ✓ = splněno._",
-           "crit": ("Hodnota", "Testovatelné", "Nic otevřeného", "Závislosti pojmenované", "Malé"),
+           "crit": ("Hodnota", "Testovatelné", "Nic otevřeného", "Závislosti pojmenované", "Odhadnutelné", "Malé"),
            "ready_col": "Připraveno", "ready": "**Připraveno**", "not_yet": "Zatím ne",
            "ready_line": "Připraveno: {r} z {n} stories.", "not_yet_line": " Zatím ne: {x}.",
            "dec_title": "Rozhodnutí PO", "dec_intro": "_Otázky, na které PO odpověděl během groomingu této feature._",
@@ -529,8 +529,20 @@ def cmd_import_prd(args):
                 if c[si].strip().lower() == "open" and "PO" in c[oi] and not re.search(r"DL-\d{3,}", q) \
                         and esc(q) not in text:
                     oq.append(add_row(rows, f"[PRD §10] {q}", f"run{k}-OQ", "Still Open"))
+    # a 🔵 outside §10 (a term, the evidence line…) is an open question too; without a row nobody asks the PO
+    sec = ""
+    for l in lines:
+        m = re.match(r"^##\s*(\d+)\b", l)
+        if m:
+            sec = m.group(1)
+            continue
+        if "🔵" not in l or sec in ("", "10") or re.search(r"DL-\d{3,}", l):
+            continue
+        item = f"[PRD §{sec}] {l.strip().lstrip('-* ').strip()}"
+        if esc(item) not in text:
+            oq.append(add_row(rows, item, f"run{k}-OQ", "Still Open"))
     save_rows(run, rows)
-    print(f"tech rows: {', '.join(tq) or 'none'} · PRD §10 rows: {', '.join(oq) or 'none'}")
+    print(f"tech rows: {', '.join(tq) or 'none'} · PRD open rows (§10 and 🔵): {', '.join(oq) or 'none'}")
 
 
 def coverage_gaps(lines):
@@ -732,6 +744,7 @@ def readiness_rows(stories, cov_lines, rows, tier):
              "Testable": lo <= scen <= hi and sid not in vague,
              "Nothing open": "🔵" not in text and "Blocked by:" not in text and not still,
              "Dependencies named": bool(re.search(r"\bI\s*✓|\bI\s*✗\s*\(", invest)),
+             "Estimable": bool(re.search(r"\bE\s*✓", invest)),
              "Small": bool(re.search(r"\bS\s*✓", invest))}
         notes = []
         if not c["Testable"]:
@@ -740,6 +753,9 @@ def readiness_rows(stories, cov_lines, rows, tier):
             notes.append("open: " + ", ".join(sorted(set(still))) if still else "open question or blocked")
         if not c["Dependencies named"]:
             notes.append("dependency without a reason")
+        if not c["Estimable"]:
+            why = re.search(r"\bE\s*✗\s*\(([^)]*)\)", invest)
+            notes.append(f"not estimable: {why.group(1)}" if why else "not estimable")
         if not c["Small"]:
             notes.append("not small")
         if not c["Value"]:
@@ -756,7 +772,7 @@ def cmd_package_parts(args):
     cov = read_lines(p(W, "coverage-report.md")) or read_lines(p(W, "coverage-report-1.md")) or []
     rows = rows_of(run)
     ready = readiness_rows(stories, cov, rows, run["tier"])
-    crit = ("Value", "Testable", "Nothing open", "Dependencies named", "Small")
+    crit = ("Value", "Testable", "Nothing open", "Dependencies named", "Estimable", "Small")
     out = ["# Definition of Ready", "", tx(run, "dor_intro"), "",
            "| Story | " + " | ".join(tx(run, "crit")) + f" | {tx(run, 'ready_col')} |",
            "|---|" + "---|" * (len(crit) + 1)]

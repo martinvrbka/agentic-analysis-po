@@ -163,7 +163,8 @@ Edit W/prd-draft.md. Write W/rounds/r1-designer-proposal.md.
 Then `dl.py state rounds=<N> "verdict=<final verdict>"`.
 
 ## Stage 4 · Final PO checkpoint and decision log check
-1. `dl.py import-prd`: logs every §9 `- TQ:` line as a Tech team row and every open PO row of §10 as a Still Open row.
+1. `dl.py import-prd`: logs every §9 `- TQ:` line as a Tech team row, and every open PO row of §10 and every 🔵 line
+   elsewhere in the PRD (a term, the evidence line…) as a Still Open row.
 2. `dl.py open` lists the ids to ask and those without a question block. For the latter, spawn a fresh Agent
    `designer`:
    ```
@@ -203,10 +204,12 @@ Write W/business-case.md.
    Run folder: W. Read D/decision-log.md, W/user-stories.md, W/definition-of-done.md.
    Write W/coverage-report-1.md.
    ```
-3. If the report has **no** `GAP` row, no "Vague acceptance criteria" items and no "DoD / AC separation issues"
-   that name a DoD item, it is final: `COV = W/coverage-report-1.md`. Otherwise run these (in parallel when both
-   apply; they edit different files):
-   - GAP rows or vague items → a fresh Agent `story-writer`, prompt:
+3. If the report has **no** `GAP` row, no "Vague acceptance criteria" items and no "DoD / AC separation issues",
+   it is final: `COV = W/coverage-report-1.md`. Otherwise run these (in parallel when both apply; they edit
+   different files). A separation issue goes to whoever owns the text it says to change: a story scenario to the
+   story-writer, a DoD item to the packager (the packager may not edit stories):
+   - GAP rows, vague items, or a separation issue that asks to change a story scenario → a fresh Agent
+     `story-writer`, prompt:
      ```
      Mode: revise. Run folder: W. Read W/prd-draft.md, D/decision-log.md, context/product-context.md, D/confirmed-facts.md, W/user-stories.md, W/coverage-report-1.md.
      Edit W/user-stories.md.
@@ -225,8 +228,10 @@ Write W/business-case.md.
    (`COV = W/coverage-report.md`). No further revision after this second check.
 4. `dl.py gaps COV`: every GAP row is reopened as COVERAGE GAP, even if it was Resolved.
 5. `dl.py import-stories COV`: every 🔵 line in the stories and every leftover vague item becomes a Still Open row,
-   so nothing open stays outside the log. DoD / AC overlaps are housekeeping, never PO questions: if it counts any,
-   spawn a fresh Agent `packager` with the `dod-fix` prompt from step 3, reading COV instead of coverage-report-1.md.
+   so nothing open stays outside the log. DoD / AC overlaps are housekeeping, never PO questions: if it counts any
+   and one of them asks to change a DoD item, spawn a fresh Agent `packager` with the `dod-fix` prompt from step 3,
+   reading COV instead of coverage-report-1.md. One that only asks to change a story is left for grooming (no
+   further story revision after the second check); name it in the summary.
 6. Summary: gaps / vague counts of the first check → of the final check, implementation-detail / separation counts,
    the `--check user-stories.md` line and `dl.py summary`.
 

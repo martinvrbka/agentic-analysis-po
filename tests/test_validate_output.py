@@ -121,7 +121,23 @@ class HookTest(ProjectTest):
         r = self.run_script("validate_output.py", "package", run["run"])
         self.assertEqual(r.returncode, 1)
         self.assertIn("technical word 'API'", r.stdout)
-        self.assertIn("🔵 open question not in the decision log", r.stdout)
+        self.assertIn("user-stories.md:27: 🔵 open question not in the decision log", r.stdout)
+
+    def test_after_checks_first_coverage_report_as_coverage(self):
+        self.assertEqual(vo.kind_of_file("coverage-report-1.md"), "coverage")
+        self.assertEqual(vo.kind_of_file("coverage-report.md"), "coverage")
+        self.assertEqual(vo.kind_of_file("rounds/r2-analyst.md"), "analyst")
+        self.assertEqual(vo.kind_of_file("rounds/rP-designer-apply.md"), "designer")
+        run = self.start()
+        self.fixture("coverage-report.md", f"{run['run']}/coverage-report-1.md")
+        r = self.run_script("validate_output.py", "--after", "coverage-checker", "coverage-report-1.md")
+        self.assertEqual(r.stdout.strip(), "OK", "a coverage report must not get the designer's checks")
+
+    def test_package_lint_flags_unlogged_question_in_final_prd(self):
+        run = self.start()
+        self.write(f"{run['run']}/final-prd.md", "## 3. Terms\n- profile: 🔵 Open Question: what does it hold?\n")
+        r = self.run_script("validate_output.py", "package", run["run"])
+        self.assertIn("final-prd.md:2: 🔵 open question not in the decision log", r.stdout)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import json
 import os
 import unittest
 
-from helpers import readf, ProjectTest
+from helpers import FIXTURES, readf, ProjectTest
 
 
 class DlTest(ProjectTest):
@@ -131,9 +131,18 @@ class DlTest(ProjectTest):
         self.fixture("prd-draft.md", f"{run['run']}/prd-draft.md")
         out = self.dl("import-prd").stdout
         self.assertIn("tech rows: DL-001, DL-002", out)
-        self.assertIn("PRD §10 rows: DL-003", out)  # only the open PO row that cites no DL id
+        self.assertIn("PRD open rows (§10 and 🔵): DL-003", out)  # only the open PO row that cites no DL id
         self.dl("import-prd")
         self.assertEqual(len(self.log(run)), 3, "importing twice adds nothing")
+        with open(self.path(run["run"], "prd-draft.md"), "a", encoding="utf-8") as f:
+            f.write("\n## 5. Solution\n### Terms\n- profile: 🔵 Open Question: what does a profile hold?\n"
+                    "- export: 🔵 Open Question: which formats? (DL-001)\n")
+        out = self.dl("import-prd").stdout
+        self.assertIn("PRD open rows (§10 and 🔵): DL-004", out)  # a 🔵 outside §10 that cites no DL id
+        self.assertEqual(self.log(run)["DL-004"]["issue"],
+                         "[PRD §5] profile: 🔵 Open Question: what does a profile hold?")
+        self.dl("import-prd")
+        self.assertEqual(len(self.log(run)), 4, "importing twice adds nothing")
 
         self.fixture("user-stories.md", f"{run['run']}/user-stories.md")
         cov = self.fixture("coverage-report.md", f"{run['run']}/coverage-report.md")
@@ -171,7 +180,7 @@ class DlTest(ProjectTest):
         out = self.dl("package-parts").stdout
         self.assertIn("Ready: 1 of 3 stories.", out)
         ready = readf(self.path(W, "readiness.md"))
-        self.assertIn("| US-01 | ✓ | ✓ | ✓ | ✓ | ✓ | **Ready** |", ready)
+        self.assertIn("| US-01 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | **Ready** |", ready)
         self.assertIn("US-02 (open: DL-003)", ready)          # Covers a Still Open row, and has a 🔵 line
         self.assertIn("US-03 (vague criteria; not small)", ready)
         decisions = readf(self.path(W, "po-decisions.md"))
@@ -180,6 +189,18 @@ class DlTest(ProjectTest):
         slices = readf(self.path(W, "slices.md"))
         self.assertIn("- **Walking skeleton:** US-01, US-02", slices)
         self.assertIn("- **Hardening:** US-03", slices)
+
+    def test_package_parts_story_that_cannot_be_estimated_is_not_ready(self):
+        run = self.start()
+        W = run["run"]
+        stories = readf(os.path.join(FIXTURES, "user-stories.md"), encoding="utf-8").replace(
+            "INVEST: I ✓ | N ✓ | V ✓ | E ✓ | S ✓ | T ✓",
+            "INVEST: I ✓ | N ✓ | V ✓ | E ✗ (waits for the list of formats) | S ✓ | T ✓", 1)
+        self.write(f"{W}/user-stories.md", stories)
+        self.fixture("coverage-report.md", f"{W}/coverage-report.md")
+        out = self.dl("package-parts").stdout
+        self.assertIn("Ready: 0 of 3 stories.", out)
+        self.assertIn("US-01 (not estimable: waits for the list of formats)", readf(self.path(W, "readiness.md")))
 
     def test_state_updates(self):
         run = self.start()

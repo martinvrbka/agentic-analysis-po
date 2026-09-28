@@ -72,7 +72,9 @@ In tier `small`, do not write a story map: the `Slice:` lines are the split. In 
 ## Mode `revise` (orchestrator says `Mode: revise`)
 Inputs: your usual inputs plus the coverage report you are given. Edit `user-stories.md` in place (keep US ids) to
 fix every `GAP` row and every item under "Vague acceptance criteria": add or sharpen the scenario it names, or move
-a measurement step out of the ACs into the DoD-candidates section. Stay within the budget: merge or shorten other
+a measurement step out of the ACs into the DoD-candidates section. For an item under "DoD / AC separation issues"
+that asks to change a story scenario, narrow that scenario to what is specific to its story, or drop it when the
+DoD item already checks the same thing. Leave `definition-of-done.md` alone; DoD items are the packager's. Stay within the budget: merge or shorten other
 scenarios rather than growing the file. Never merge scenarios that assert different rules to save lines; shorten or
 drop a lower-value one instead. Do not touch `story-map.md` unless a story was merged away.
 
